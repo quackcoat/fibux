@@ -3,6 +3,7 @@ import os
 import glob
 import tkinter as tk
 import warnings
+import ast
 from tkinter import filedialog
 from datetime import datetime,timedelta
 from prettytable import PrettyTable as pt
@@ -85,6 +86,34 @@ def import_settings(_type):
                             marked[mark_name]['end'].append(end_date)
                             marked[mark_name]['value'].append(value)
         return marked
+    elif _type == 'import':
+        # Convert the string representation to a dictionary using ast.literal_eval
+        settings = {}
+        with open("settings." + _type) as f:
+            for line in f:
+                if '=' in line:
+                    _set = line.strip().split("=")[0]
+                    settings[_set] = line.strip().split("=")[1]
+        return settings
+    elif _type == 'views':
+        settings = {}
+        filters = [0]*100
+        views = [0]*100
+        # Read content from the file
+        with open("settings." + _type) as f:
+            content = f.read()
+        exec(content)
+        filters_out = []
+        for f in filters:
+            if f != 0:
+                filters_out.append(f)
+        settings['filters'] = filters_out
+        views_out = []
+        for v in views:
+            if v != 0:
+                views_out.append(v)
+        settings['views'] = views_out
+        return settings
     else:
         settings = {}
         with open("settings." + _type) as f:
@@ -144,14 +173,14 @@ def add_missing_columns(data):
 def import_data(input_df=None,new=False):
     print('')
     print('')
-    settings = import_settings('import')
-    headers = settings["headers"]
-    csv_sep = settings["csv_sep"]
-    decimal_sep = settings["decimal_sep"]
-    thousand_sep = settings["thousand_sep"]
-    date_format = settings["date_format"]
-    import_folder = settings.get("import_folder", None)
-    csv_encoding = settings["csv_encoding"]
+    import_setting = import_settings('import')
+    headers = import_setting["headers"]
+    csv_sep = import_setting["csv_sep"]
+    decimal_sep = import_setting["decimal_sep"]
+    thousand_sep = import_setting["thousand_sep"]
+    date_format = import_setting["date_format"]
+    import_folder = import_setting.get("import_folder", None)
+    csv_encoding = import_setting["csv_encoding"]
 
     min_col = ['posted_date','text','value','balance']
 
@@ -267,30 +296,43 @@ def import_data(input_df=None,new=False):
     else:
         return None
 
-def update_view(df,df_fil,v,vfil,categories,get_sel=0):
+def update_view(df,df_fil,v,categories,get_sel=0):
     # Select correct view
-    if v["status"] == "balance":
+    print_col = settings['views'][v["view"]]['columns']
+    align_col = settings['views'][v["view"]]['align']
+    
+    '''
         print_col = vfil["balance_columns"]
         align_col = vfil["balance_align"]
     if v["status"] == "categories":
         print_col = vfil["categories_columns"]
         align_col = vfil["categories_align"]
+    '''
     # Set filters based on type
     filters = 0
     # Get filtered dataframe
     df_filtered = filter_dataframe(df, df_fil)
     #Sort
-    sort_type = v["status"] + "_sort"
-    sort_col = df_fil[sort_type]["column"]
-    sort_dir = df_fil[sort_type]["direction"]
+    sort_col = df_fil['sort']['column']
+    sort_dir = df_fil['sort']["direction"]
+    sort2_col = df_fil['sort2']['column']
+    sort2_dir = df_fil['sort2']['direction']
+    if len(sort2_col) == 0:
+        sort2_col = 'id'
+    if len(sort2_dir) == 0:
+        sort2_dir = 'des'
     if sort_dir != 'des':
         sort_asc = False
     else:
         sort_asc = True
+    if sort2_dir != 'des':
+        sort2_asc = False
+    else:
+        sort2_asc = True
 
-    df_sorted = df_filtered.sort_values(by=sort_col, ascending=sort_asc)
+    df_sorted = df_filtered.sort_values(by=[sort_col,sort2_col], ascending=[sort_asc,sort2_asc])
 
-    pages = m.ceil(len(df_sorted)/int(vfil["rows"]))
+    pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
     total_length = len(df_sorted)
     # Dataframe to show
     page = int(v["page"]) 
@@ -311,9 +353,9 @@ def update_view(df,df_fil,v,vfil,categories,get_sel=0):
     '''
     if get_sel != 'all':
         if page > 1:
-            df_sorted = df_sorted.iloc[:(1-page)*int(v["pages"]),:].copy()
+            df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
         if page < pages: 
-            df_sorted = df_sorted.iloc[(pages - page - 1) * int(v["pages"]) + (total_length % int(v["pages"])):,:]
+            df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
     
     if len(df_sorted) > 0:
         float_format = lambda x: f"{x:.2f}"
@@ -330,8 +372,7 @@ def update_view(df,df_fil,v,vfil,categories,get_sel=0):
         df_sorted['date'] = df_sorted['date'].dt.strftime('%d %b %Y')
         # Changing category column to name.
         
-        'category_type','category'
-        if v["status"] == "categories":
+        if 'category' in settings['views'][v['view']]['columns']:
             for index, row in df_sorted.iterrows():
                 category_type = row['category_type']
                 category = row['category']
@@ -345,7 +386,7 @@ def update_view(df,df_fil,v,vfil,categories,get_sel=0):
         for index,row in df_sorted[['select'] + print_col].iterrows():
             table.add_row(row)
         print('')
-        tprint(v["status"],font="aquaplan")
+        tprint(settings['views'][v['view']]['name'],font="aquaplan")
         print(table)
         print("Page " + str(page) + " of " + str(pages))
         return v
@@ -461,7 +502,7 @@ def filter_dataframe(df, df_filter,get_ids=False):
         #not used
         return filtered_df['id']
 
-def find_column(input_string,view_type='',read_only=True):
+def find_column(input_string,read_only=True):
     # Define a dictionary of predefined words with their corresponding 3-letter keys
     if read_only:
         words = {
@@ -543,7 +584,7 @@ def auto_change_dataframe(df, df_filt,cur_view, view_filt, auto, input_ids):
         mod_filt = df_filt.copy()
         for _c,_v in auto_value['search'].items():
             mod_filt = change_filter(mod_filt,_c,_v)
-        filter_ids = update_view(df, mod_filt, cur_view, view_filt,None,'all')
+        filter_ids = update_view(df, mod_filt, cur_view,None,'all')
         combined_ids = pd.concat([input_ids, filter_ids],ignore_index=True)
         change_ids = combined_ids[combined_ids.duplicated()]
         for _c,_v in auto_value['change'].items():
@@ -915,9 +956,8 @@ def print_help(commands,view):
         print('h=help, t=update, d=post detail')
         print()
         print('Change view or values')
-        if view['status'] == 'categories':
-            print('f=filter posts - c=change column value - s=split a row')
-            print('enter f,c or s for detailts on each function')
+        print('f=filter posts - c=change column value - s=split a row')
+        print('enter f,c or s for detailts on each function')
         print()
         print('Page options:')
         print('pn   Go to next page')
@@ -1012,11 +1052,13 @@ if __name__ == '__main__':
     readline.parse_and_bind("tab: complete")
     readline.set_history_length(1000)
     settings = import_settings('general')
+    view_setting = import_settings('views')
+    settings['filters'] = view_setting['filters']
+    settings['views'] = view_setting['views']
     categories,auto_categories = import_settings('categories')
     marked = import_settings('marked')
     
-    
-    
+    '''
     view_filter = {}
     view_filter["rows"] = settings["view_rows"]
     view_filter["balance_sort"] = settings["view_balance_sort"]
@@ -1027,14 +1069,17 @@ if __name__ == '__main__':
     view_filter["categories_align"] = settings["view_categories_align"]
     #same filters
     # date,text,value,timestamp
-    
+    '''
     view = {}
-    view["status"] = settings.get("start_view","balance")
+    view["view"] = 0
+    view["filter"] = 0
     view["page"] = '1'
-    view["pages"] = settings["view_rows"]
+    # Reset filter to settings filter when reset
+    # Define filter using a view key
+    #view["pages"] = settings["view_rows"]
     
-    df_default_filter = {'balance_sort':{'column':view_filter["balance_sort"],'direction':'des'},'categories_sort':{'column':view_filter["categories_sort"],'direction':'des'}}
-    df_filters = df_default_filter.copy()
+    #df_default_filter = {'balance_sort':{'column':view_filter["balance_sort"],'direction':'des'},'categories_sort':{'column':view_filter["categories_sort"],'direction':'des'}}
+    df_filters = settings['filters'][view["filter"]].copy()
     dfs_history = []
     current_history_index = 0
     dfs = None
@@ -1052,7 +1097,7 @@ if __name__ == '__main__':
         if os.path.exists(pickle_file_path):
             print(f'Loading dataframe from {os.path.abspath(pickle_file_path)}')
             new_dfs = pd.read_pickle(pickle_file_path)
-            view = update_view(new_dfs,df_filters,view,view_filter,categories)
+            view = update_view(new_dfs,df_filters,view,categories)
             print(f'Loaded dataframe from {os.path.abspath(pickle_file_path)}')
             dfs_history.append(new_dfs.copy())
             print_help('basic',view)
@@ -1065,6 +1110,18 @@ if __name__ == '__main__':
         _input = input('')
         if len(_input) > 0:
             try:
+                for fil,i in zip(settings['filters'],range(len(settings['filters']))):
+                    if 'key' in fil:
+                        if _input == fil['key']:
+                            df_filters = fil
+                            view["filter"] = i
+                            break
+                for vie,i in zip(settings['views'],range(len(settings['views']))):
+                    if 'key' in vie:
+                        if _input == vie['key']:
+                            view["view"] = i
+                            view["page"] = '1'
+                            break
                 if _input in 'ur':
                     if _input.lower() == 'u':
                         current_history_index += 1
@@ -1131,23 +1188,8 @@ if __name__ == '__main__':
                     if new_dfs is None:
                         skip_update = True
                         warn_message.append('Import canceled')
-                if _input in ['ba'] or _input[0] in 'pcfsxhd' or _input.split(' ')[0] == 'auto' :
-                    if _input == 'ba':
-                        view["status"] = 'balance'
-                    elif _input == 'ca':
-                        view["status"] = 'categories'
-                    # Switch
-                    elif _input[0] == 'x':
-                        if view["status"] == "categories":
-                            view["status"] = "balance"
-                        elif view["status"] == "balance":
-                            view["status"] = "categories"
-                    # Categories
-                    elif _input.split(' ')[0] == 'ca':
-                        if view["status"] != "categories":
-                            view["status"] = "categories"
-                            view["page"] = '1'
-                    elif _input[0] == 'h':
+                if _input[0] in 'pcfshd' or _input.split(' ')[0] == 'auto' :
+                    if _input[0] == 'h':
                         print_help('basic',view)
                         skip_update = True
                     # Pages
@@ -1177,21 +1219,27 @@ if __name__ == '__main__':
                             skip_update = True
                         if len(_split) == 2: 
                             if _split[1][:min(3,len(_split[1]))] == 'res':
-                                df_filters = df_default_filter.copy()
+                                df_filters = settings['filters'][view['filter']].copy()
                         if len(_split) == 3: 
                             if _split[1] == 'del':
-                                _column = find_column(_split[2],view["status"])
+                                _column = find_column(_split[2])
                                 if _column in df_filters:
                                     del df_filters[_column]
-                            elif _split[1] == 'sor' or _split[1] == 'sort':
+                            elif _split[1] in ['sor','sor2','sort','sort2']:
                                 if _split[2] == 'asc' or _split[2] == 'des':
-                                    df_filters[view['status']+'_sort']['direction'] = _split[2]
+                                    if _split[1][-1] != '2':
+                                        df_filters['sort']['direction'] = _split[2]
+                                    else:
+                                        df_filters['sort2']['direction'] = _split[2]
                                 else:
-                                    _column = find_column(_split[2],view["status"])
+                                    _column = find_column(_split[2])
                                     if _column is not None:
-                                        df_filters[view['status']+'_sort']['column'] = _column
+                                        if _split[1][-1] != '2':
+                                            df_filters['sort']['column'] = _column
+                                        else:
+                                            df_filters['sort2']['column'] = _column
                             else:
-                                _column = find_column(_split[1],view["status"])
+                                _column = find_column(_split[1])
                                 df_filters = change_filter(df_filters,_column,_split[2])
                     # select detail
                     if _input.split(' ')[0] == 'd':
@@ -1199,7 +1247,7 @@ if __name__ == '__main__':
                         if len(_split) == 1:
                             print_help('detail',view)
                         else:
-                            change_ids = update_view(new_dfs,df_filters,view,view_filter,None,_split[1])
+                            change_ids = update_view(new_dfs,df_filters,view,None,_split[1])
                             print(len(change_ids))
                             if len(change_ids) == 1:
                                 print()
@@ -1239,9 +1287,9 @@ if __name__ == '__main__':
                             print_help('change',view)
                             skip_update = True
                         elif len(_split) >= 4 or _input.split(' ')[0] == 'cd':
-                            _column = find_column(_split[2],view["status"],False)
+                            _column = find_column(_split[2],False)
                             if _column is not None:
-                                change_ids = update_view(new_dfs,df_filters,view,view_filter,None,_split[1])
+                                change_ids = update_view(new_dfs,df_filters,view,None,_split[1])
                                 if len(change_ids) > 0:
                                     if _input.split(' ')[0] == 'cd':
                                         _value = ''
@@ -1279,7 +1327,7 @@ if __name__ == '__main__':
                             id_sel = _split[1]
                         else:
                             id_sel = 'all'
-                        change_ids = update_view(new_dfs,df_filters,view,view_filter,None,id_sel)
+                        change_ids = update_view(new_dfs,df_filters,view,None,id_sel)
                         new_dfs = auto_change_dataframe(new_dfs,df_filters, view,view_filter,auto_categories,change_ids)
                         dataframe_update = True
                     # Split
@@ -1290,12 +1338,12 @@ if __name__ == '__main__':
                             skip_update = True
                         elif len(_split) >= 3 or _input.split(' ')[0] == 'sd': 
                             if _input.split(' ')[0] == 'sd':
-                                change_ids = update_view(new_dfs,df_filters,view,view_filter,None,_split[1])
+                                change_ids = update_view(new_dfs,df_filters,view,None,_split[1])
                                 if len(change_ids) > 0:
                                     new_dfs = delete_split_dataframe_rows(new_dfs, change_ids)
                                 else: skip_update = True
                             else:
-                                change_ids = update_view(new_dfs,df_filters,view,view_filter,None,_split[1])
+                                change_ids = update_view(new_dfs,df_filters,view,None,_split[1])
                                 if len(change_ids) > 0:
                                     new_value = float(_split[2])
                                     if new_value is not None and new_value != 0:
@@ -1370,7 +1418,7 @@ if __name__ == '__main__':
                     #Update view
                     a = 0
                 if not skip_update:
-                    view = update_view(new_dfs,df_filters,view,view_filter,categories)
+                    view = update_view(new_dfs,df_filters,view,categories)
                 else:
                     skip_update = False
                 if dataframe_update:
@@ -1389,7 +1437,7 @@ if __name__ == '__main__':
                 # Print or log the traceback string
                 warn_message.append(f"Error: {traceback_str}")
                 if len(dfs_history):
-                    view = update_view(dfs_history[current_history_index],df_filters,view,view_filter,categories)
+                    view = update_view(dfs_history[current_history_index],df_filters,view,categories)
                 warn_message.append(f"Change command and try again.")
                 warn_message.append('')
             for w in warn_message: print(w)
