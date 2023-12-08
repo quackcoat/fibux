@@ -1,0 +1,17 @@
+view_rows=30
+auto_load=./saved_dataframe.pkl
+#Custom views
+#Balance(bal)
+#columns=[id,posted_date,text,value,balance,account]
+#align=[c,c,l,r,r,c,l]
+#sort=imported
+#Categories(cat)
+#columns=[id,date,text,category,amount,marked,status]
+#align=[c,c,l,l,r,l,c]
+#sort=date
+view_balance_columns=[id,posted_date,text,value,balance,account]
+view_balance_align=[c,c,l,r,r,c,l]
+view_balance_sort=imported
+view_categories_columns=[id,date,text,category,amount,marked,status]
+view_categories_align=[c,c,l,l,r,l,c]
+view_categories_sort=date

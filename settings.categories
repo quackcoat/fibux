@@ -1,0 +1,22 @@
+*Categories
+# Number for category name. letter for sub category name
+1;Indkomst
+a;Anden indkomst
+b;Løn
+c;Feriepenge
+2;Husholdning
+a;Dagligvarer
+b;Apotek
+c;Kiosk
+3;Andet
+a;Forsikring
+b;Daginstitution
+c;Tv & streaming
+
+*Auto category
+# columns to change = category,marked,date. columns to filter for = text,amount,notes. Use comma to search for multiple values.
+marked=jakob;info=XXXX 1056,XXXX1056
+marked=stephanie;info=XXXX 1130
+cat=2a;text=rema,netto,brugsen,abc lavpris,lidl
+category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,h&m
+#date=next;posted_date=day;text=løn,ungeydelse
