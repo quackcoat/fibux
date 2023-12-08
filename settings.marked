@@ -1,0 +1,14 @@
+Jakob;1-2023;1-2023;500
+Jakob;1-2023;5-2023;2000
+Stephanie;1-2023;5-2023;2000
+#
+#Create a function that can read this file and put the data into a dataframe. The rows consists of 4 columns. 1. Name, 2. start date in format m-yyyy, 3. end date in format m-yyyy, 4. value for each month. There should be no calculation in this function. Just put the values to a dataframe in correct formats
+#
+#Example of data is:
+#Jakob;1-2023;1-2023;500
+#Jakob;1-2023;5-2023;2000
+#Stephanie;1-2023;5-2023;2000
+#
+#Create another function to read the dataframe with the options to get one of these outputs based on type input.
+#if input_type is get_mark: complete string part eg. input1=ja should get jakob, if no input1 is given a list of all unique names should be returned
+#if input_type is get_value: total summed value for a name on a specific date. eg. input1: jak, input2: 3-2023 should get the value of 6500. If no input1 is given, a list of all unique names and their summed values should be returned. If no input2 is given, the date should 1st day of current month. To get the summed value it should be calculated how many months from the start months to the input2 months and multiply with value. If input2 date is more than end date it should be only number of months between start and end.
