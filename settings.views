@@ -1,0 +1,27 @@
+views[0] = {"key": "bal", "name":"Balance",
+            "columns": ["id","posted_date","text","value","balance","account"],
+            "align": ["c","c","l","r","r","c","l"]
+           }
+filters[0] = {"key": "bal",
+             "sort": {"column": "imported", "direction": "des"},
+             "sort2": {"column": "", "direction": ""},
+             "text": {"contains": ["rema"]}
+            }
+views[1] = {"key": "cat","name":"Categories",
+            "columns": ["id","date","text","category","amount","marked","status"],
+            "align": ["c","c","l","l","r","l","c"]
+           }
+filters[1] = {"key": "cat",
+             "sort": {"column": "date", "direction": "des"},
+             "sort2": {"column": "id", "direction": "des"},
+             "status": {"contains": ["ok"]}
+            }
+views[2] = {"key": "ste","name":"Stephanie",
+            "columns": ["id","date","text","category","amount","status"],
+            "align": ["c","c","l","l","r","c"]
+           }
+filters[2] = {"key": "ste",
+             "sort": {"column": "status", "direction": "des"},
+             "sort2": {"column": "date", "direction": "des"},
+             "marked": {"equal": ["Stephanie"]}
+            }
