@@ -1,5 +1,7 @@
 import pandas as pd
+import re
 import os
+import re
 import glob
 import tkinter as tk
 import warnings
@@ -770,14 +772,14 @@ def convert_value_to_data_type(dfs,v , column, value):
         return None
 
 def str_to_datetime(date_string):
-    settings = import_settings('import')
+    i_settings = import_settings('import')
     if isinstance(date_string, int) or '-' not in date_string:
         # if the input is a negative integer, subtract that number of days from the current date
         dt = datetime.now() - timedelta(days=abs(int(date_string)))
     else:
         try:
             # try to parse the date string using the specified format
-            dt = datetime.strptime(date_string, settings['date_format'])
+            dt = datetime.strptime(date_string, i_settings['date_format'])
         except ValueError:
             # if that fails, try to parse the date string as yyyy-mm-dd format
             dt = datetime.strptime(date_string, '%Y-%m-%d')
@@ -889,10 +891,13 @@ def change_filter(input_filters, input_column,input_value):
      
     if input_column is not None:
         if len(input_value) > 0 and input_value[0] in '<>=':
-            if input_column in ['date','changed','imported']:
-                _value = str_to_datetime(_split[2][1:])
+            if input_column in ['posted_date','date','changed','imported']:
+                if input_value[1] == '-':
+                    _value = parse_duration_string(input_value[1:])
+                else: 
+                    _value = str_to_datetime(input_value[1:])
             else:
-                _value = float(_split[2][1:])
+                _value = float(input_value[1:])
         else:
             _value = input_value.strip('\'')
         if input_value[0] == '>':
@@ -945,6 +950,63 @@ def change_filter(input_filters, input_column,input_value):
             else:
                 input_filters.setdefault(input_column, {})['contains'] = _value.split(',')
     return input_filters
+import re
+from datetime import timedelta
+
+def parse_duration_string(duration_input):
+    # Define regular expressions for parsing different components
+    year_pattern = re.compile(r'(\d+)yea')
+    month_pattern = re.compile(r'(\d+)mon')
+    day_pattern = re.compile(r'(\d+)day')
+    hour_pattern = re.compile(r'(\d+)hou')
+    min_pattern = re.compile(r'(\d+)min')
+    sec_pattern = re.compile(r'(\d+)sec')
+    
+    duration_string = duration_input[1:] 
+    # Initialize timedelta with default values
+    duration = timedelta()
+
+    # Parse each component and add it to the timedelta
+    match = year_pattern.search(duration_string)
+    if match:
+        duration += timedelta(days=int(match.group(1)) * 365)
+
+    match = month_pattern.search(duration_string)
+    if match:
+        duration += timedelta(days=int(match.group(1)) * 30)
+
+    match = day_pattern.search(duration_string)
+    if match:
+        duration += timedelta(days=int(match.group(1)))
+
+    match = hour_pattern.search(duration_string)
+    if match:
+        duration += timedelta(hours=int(match.group(1)))
+
+    match = min_pattern.search(duration_string)
+    if match:
+        duration += timedelta(minutes=int(match.group(1)))
+
+    match = sec_pattern.search(duration_string)
+    if match:
+        duration += timedelta(seconds=int(match.group(1)))
+
+    # Get current datetime
+    current_datetime = datetime.now()
+
+    # Subtract the duration from the current datetime
+    result_datetime = current_datetime - duration
+
+    return result_datetime
+
+def convert_delta_filter_time():
+    for i in range(len(settings['filters'])):
+        for column_name, column_filter in settings['filters'][i].items():
+            if 'date' in column_name or 'stamp' in column_name:
+                for bound, time_val in column_filter.items():
+                    if '-' == time_val[0]:
+                        new_val = parse_duration_string(time_val)
+                        settings['filters'][i][column_name][bound] = new_val
 
 def print_help(commands,view):
     if commands == 'basic':
@@ -992,6 +1054,8 @@ def print_help(commands,view):
         print('    /se to show empty colums')
         print('    /oe to show only empty colums')
         print('    string to filter based in a the string is in the column')
+        print()
+        print('For filtering on time, use either date string(2023-11-15) or relative date from today(-1year2month3day4hour5min6sec)')
         print()
         print('Other filter options:')
         print('f reset  - reset all filter')
@@ -1059,6 +1123,8 @@ if __name__ == '__main__':
     settings['views'] = view_setting['views']
     categories,auto_categories = import_settings('categories')
     marked = import_settings('marked')
+
+    convert_delta_filter_time()
     
     '''
     view_filter = {}
@@ -1228,18 +1294,25 @@ if __name__ == '__main__':
                                 if _column in df_filters:
                                     del df_filters[_column]
                             elif _split[1] in ['sor','sor2','sort','sort2']:
+                                if _split[1][-1] != '2':
+                                    sort_name = 'sort'
+                                else:
+                                    sort_name = 'sort2'
                                 if _split[2] == 'asc' or _split[2] == 'des':
                                     if _split[1][-1] != '2':
-                                        df_filters['sort']['direction'] = _split[2]
+                                        df_filters[sort_name]['direction'] = _split[2]
                                     else:
-                                        df_filters['sort2']['direction'] = _split[2]
+                                        df_filters[sort_name]['direction'] = _split[2]
                                 else:
                                     _column = find_column(_split[2])
                                     if _column is not None:
-                                        if _split[1][-1] != '2':
-                                            df_filters['sort']['column'] = _column
-                                        else:
-                                            df_filters['sort2']['column'] = _column
+                                       if df_filters[sort_name]['column'] != _column:
+                                           df_filters[sort_name]['column'] = _column
+                                       else:
+                                           if df_filters[sort_name]['direction'] == 'des':
+                                               df_filters[sort_name]['direction'] = 'asc'
+                                           else:
+                                               df_filters[sort_name]['direction'] = 'des'
                             else:
                                 _column = find_column(_split[1])
                                 df_filters = change_filter(df_filters,_column,_split[2])
