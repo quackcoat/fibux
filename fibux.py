@@ -88,7 +88,7 @@ def import_settings(_type):
                             marked[mark_name]['end'].append(end_date)
                             marked[mark_name]['value'].append(value)
         return marked
-    elif _type == 'import':
+    elif _type == 'import' and False:
         # Convert the string representation to a dictionary using ast.literal_eval
         settings = {}
         with open("settings." + _type) as f:
@@ -194,7 +194,6 @@ def import_data(input_df=None,new=False):
         print('The following headers in not found in header settings.')
         for _ in mis_col:
             print(_)
-        return dfs,None
 
     found_csv = False
     # find newest csv file in folder
@@ -580,7 +579,7 @@ def change_dataframe_rows(df,v , column_to_change, dataframe_ids, new_value):
 
     return df 
 
-def auto_change_dataframe(df, df_filt,cur_view, view_filt, auto, input_ids):
+def auto_change_dataframe(df, df_filt,cur_view, auto, input_ids):
     mod_df = df.copy()
     for auto_value in auto: 
         mod_filt = df_filt.copy()
@@ -1403,7 +1402,7 @@ if __name__ == '__main__':
                         else:
                             id_sel = 'all'
                         change_ids = update_view(new_dfs,df_filters,view,None,id_sel)
-                        new_dfs = auto_change_dataframe(new_dfs,df_filters, view,view_filter,auto_categories,change_ids)
+                        new_dfs = auto_change_dataframe(new_dfs,df_filters, view,auto_categories,change_ids)
                         dataframe_update = True
                     # Split
                     if _input.split(' ')[0] == 's' or _input.split(' ')[0] == 'sd':

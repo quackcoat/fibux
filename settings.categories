@@ -2,21 +2,98 @@
 # Number for category name. letter for sub category name
 1;Indkomst
 a;Anden indkomst
-b;Løn
-c;Feriepenge
-2;Husholdning
-a;Dagligvarer
-b;Apotek
-c;Kiosk
-3;Andet
-a;Forsikring
-b;Daginstitution
-c;Tv & streaming
-
+b;Børnepenge
+c;Dagpenge
+d;Feriepenge
+e;Løn
+f;Overskydende skat
+g;Renteindtægter
+h;SU & studielån
+2;Bolig
+a;Andre boligudgifter
+b;Boliglån & husleje
+c;El, vand & varme
+e;Indbo- & familieforsikring
+f;Vedligeholdelse
+3;Transport
+a;Anden transport
+b;Bilforsikring
+c;Bilkøb & lån
+d;Brændstof
+e;Bus, tog, færge o.l.
+f;Grøn ejerafgift
+g;Kørselsordning
+h;Parkering
+i;Værksted & reservedele
+4;Husholdning
+a;Apotek
+b;Dagligvarer
+c;Kantine
+d;Kiosk, bager & specialbutikker
+5;Øvrige faste
+a;Briller & kontaktlinser
+b;Fagforening & A-kasse
+c;Institutioner
+d;Livs- & ulykkesforsikring
+e;Studieudgifter
+f;Sundheds- & sygeforsikring
+g;Telefoni & internet
+h;TV & streamingstjenester
+6;Privatforbrug
+a;Andet privatforbrug
+b;Babyudstyr
+c;Bar, café & restaurant
+d;Biograf, koncerter & forlystelser
+e;Elektronik
+f;Fastfood & takeaway
+g;Film, musik & læsestof
+h;Frisør & personligpleje
+i;Gambling
+j;Gaver
+k;Hobby & fritid
+l;Kontanthævninger
+m;Møbler & boligudstyr
+n;Online services & software
+o;Serviceydelser & rådgivning
+p;Spil & legetøj
+q;Sport & fritid
+r;Tobak & alkohol
+s;Tøj & sko
+7;Ferie
+a;Billeje
+b;Transport
+c;Ferieaktiviteter
+d;Fly
+e;Hotel
+f;Mad
+g;Rejseforsikring
+h;Shopping
+8;Diverse
+a;Bankgebyr
+b;Behandling & læger
+c;Bøder & afgifter
+d;Restskat
+9;Lån
+a;Forbrugslån
+b;Privatlån
+c;Studielån
+10;Opsparing
+a;Børneopsparing
+b;Opsparingskonto
+c;Pension
+d;Værdipapirer
+11;Vis ikke
+a;Ignorer
+b;Kontooverførsel
+c;Udlæg
 *Auto category
 # columns to change = category,marked,date. columns to filter for = text,amount,notes. Use comma to search for multiple values.
 marked=jakob;info=XXXX 1056,XXXX1056
-marked=stephanie;info=XXXX 1130
-cat=2a;text=rema,netto,brugsen,abc lavpris,lidl
-category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,h&m
-#date=next;posted_date=day;text=løn,ungeydelse
+marked=stephanie;info=XXXX 1130,XXXX1130
+category=løn;text=lønoverførsel
+category=feriepenge;text=feriepenge
+cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,lidl,aldi,coop
+cat=apotek;marked=;text=apotek
+category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa
+category=fastfood;text=pizza,just-eat,burger
+category=brændstof;text=q8,ingo,circle,f24
