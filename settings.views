@@ -5,7 +5,7 @@ views[0] = {"key": "bal", "name":"Balance",
 filters[0] = {"key": "bal",
              "sort": {"column": "imported", "direction": "des"},
              "sort2": {"column": "", "direction": ""},
-             "text": {"contains": ["rema"]}
+             "timestamp": {"min": "-1year2month"}
             }
 views[1] = {"key": "cat","name":"Categories",
             "columns": ["id","date","text","category","amount","marked","status"],
