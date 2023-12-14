@@ -2,6 +2,7 @@ import pandas as pd
 import re
 import os
 import re
+import csv
 import glob
 import tkinter as tk
 import warnings
@@ -298,108 +299,109 @@ def import_data(input_df=None,new=False):
         return None
 
 def update_view(df,df_fil,v,categories,get_sel=0):
-    # Select correct view
-    print_col = settings['views'][v["view"]]['columns']
-    align_col = settings['views'][v["view"]]['align']
-    
-    '''
-        print_col = vfil["balance_columns"]
-        align_col = vfil["balance_align"]
-    if v["status"] == "categories":
-        print_col = vfil["categories_columns"]
-        align_col = vfil["categories_align"]
-    '''
-    # Set filters based on type
-    filters = 0
-    # Get filtered dataframe
-    df_filtered = filter_dataframe(df, df_fil)
-    #Sort
-    sort_col = df_fil['sort']['column']
-    sort_dir = df_fil['sort']["direction"]
-    sort2_col = df_fil['sort2']['column']
-    sort2_dir = df_fil['sort2']['direction']
-    if len(sort2_col) == 0:
-        sort2_col = 'id'
-    if len(sort2_dir) == 0:
-        sort2_dir = 'des'
-    if sort_dir != 'des':
-        sort_asc = False
-    else:
-        sort_asc = True
-    if sort2_dir != 'des':
-        sort2_asc = False
-    else:
-        sort2_asc = True
-
-    df_sorted = df_filtered.sort_values(by=[sort_col,sort2_col], ascending=[sort_asc,sort2_asc])
-
-    pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
-    total_length = len(df_sorted)
-    # Dataframe to show
-    page = int(v["page"]) 
-    if page < 1:
-        page = 1
-    if page > pages:
-        page = pages
-    v["page"] = str(page)
-    '''
-    if page > 1:
-      lloc = (1-page)*int(v["pages"])
-    else:
-      lloc = 1e10
-    if page < pages:
-        floc = (pages - page - 1) * int(v["pages"]) + (total_length % int(v["pages"]))
-    else:
-        flic = 0
-    '''
-    if get_sel != 'all':
-        if page > 1:
-            df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
-        if page < pages: 
-            df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
-    
-    if len(df_sorted) > 0:
-        float_format = lambda x: f"{x:.2f}"
-        for c in ['amount','value','balance']:
-            if c in df_sorted.columns:
-                df_sorted[c] = df[c].apply(float_format)
-    if get_sel == 0:
-        df_sorted.loc[:,'select'] = range(len(df_sorted), 0, -1)
-        table = pt(list(['select'] + print_col))
-        table._max_width = {col: 32 for col in print_col}
-        for col, align in zip(print_col, align_col):
-            table.align[col] = align
-        df_sorted['posted_date'] = df_sorted['posted_date'].dt.strftime('%d %b %Y')
-        df_sorted['date'] = df_sorted['date'].dt.strftime('%d %b %Y')
-        # Changing category column to name.
+    if v["view"] < 1000:
+        # Select correct view
+        print_col = settings['views'][v["view"]]['columns']
+        align_col = settings['views'][v["view"]]['align']
         
-        if 'category' in settings['views'][v['view']]['columns']:
-            for index, row in df_sorted.iterrows():
-                category_type = row['category_type']
-                category = row['category']
-                if len(category) > 0:
-                    category_name = categories[category_type]['name']
-                    sub_category_name = categories[category_type][category]
-                    _text = f"{category_name}-{sub_category_name}"
-                    _text = category_name + ' - ' + sub_category_name
-                    df_sorted.at[index, 'category'] = _text.strip()
-        
-        for index,row in df_sorted[['select'] + print_col].iterrows():
-            table.add_row(row)
-        print('')
-        tprint(settings['views'][v['view']]['name'],font="aquaplan")
-        print(table)
-        print("Page " + str(page) + " of " + str(pages))
-        return v
-    else:
-        # Get and return row number
-        if get_sel == 'all':
-            return df_sorted['id']
+        '''
+            print_col = vfil["balance_columns"]
+            align_col = vfil["balance_align"]
+        if v["status"] == "categories":
+            print_col = vfil["categories_columns"]
+            align_col = vfil["categories_align"]
+        '''
+        # Set filters based on type
+        filters = 0
+        # Get filtered dataframe
+        df_filtered = filter_dataframe(df, df_fil)
+        #Sort
+        sort_col = df_fil['sort']['column']
+        sort_dir = df_fil['sort']["direction"]
+        sort2_col = df_fil['sort2']['column']
+        sort2_dir = df_fil['sort2']['direction']
+        if len(sort2_col) == 0:
+            sort2_col = 'id'
+        if len(sort2_dir) == 0:
+            sort2_dir = 'des'
+        if sort_dir != 'des':
+            sort_asc = False
         else:
-            _list = convert_string_to_list(get_sel)
-            n = len(df_sorted)  # number of rows in the DataFrame
-            sel_list = [n - i for i in _list]  # convert to zero-based indices
-            return df_sorted.iloc[sel_list]['id']
+            sort_asc = True
+        if sort2_dir != 'des':
+            sort2_asc = False
+        else:
+            sort2_asc = True
+
+        df_sorted = df_filtered.sort_values(by=[sort_col,sort2_col], ascending=[sort_asc,sort2_asc])
+
+        pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
+        total_length = len(df_sorted)
+        # Dataframe to show
+        page = int(v["page"]) 
+        if page < 1:
+            page = 1
+        if page > pages:
+            page = pages
+        v["page"] = str(page)
+        '''
+        if page > 1:
+          lloc = (1-page)*int(v["pages"])
+        else:
+          lloc = 1e10
+        if page < pages:
+            floc = (pages - page - 1) * int(v["pages"]) + (total_length % int(v["pages"]))
+        else:
+            flic = 0
+        '''
+        if get_sel != 'all':
+            if page > 1:
+                df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
+            if page < pages: 
+                df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
+        
+        if len(df_sorted) > 0:
+            float_format = lambda x: f"{x:.2f}"
+            for c in ['amount','value','balance']:
+                if c in df_sorted.columns:
+                    df_sorted[c] = df[c].apply(float_format)
+        if get_sel == 0:
+            df_sorted.loc[:,'select'] = range(len(df_sorted), 0, -1)
+            table = pt(list(['select'] + print_col))
+            table._max_width = {col: 32 for col in print_col}
+            for col, align in zip(print_col, align_col):
+                table.align[col] = align
+            df_sorted['posted_date'] = df_sorted['posted_date'].dt.strftime('%d %b %Y')
+            df_sorted['date'] = df_sorted['date'].dt.strftime('%d %b %Y')
+            # Changing category column to name.
+            
+            if 'category' in settings['views'][v['view']]['columns']:
+                for index, row in df_sorted.iterrows():
+                    category_type = row['category_type']
+                    category = row['category']
+                    if len(category) > 0:
+                        category_name = categories[category_type]['name']
+                        sub_category_name = categories[category_type][category]
+                        _text = f"{category_name}-{sub_category_name}"
+                        _text = category_name + ' - ' + sub_category_name
+                        df_sorted.at[index, 'category'] = _text.strip()
+            
+            for index,row in df_sorted[['select'] + print_col].iterrows():
+                table.add_row(row)
+            print('')
+            tprint(settings['views'][v['view']]['name'],font="aquaplan")
+            print(table)
+            print("Page " + str(page) + " of " + str(pages))
+            return v
+        else:
+            # Get and return row number
+            if get_sel == 'all':
+                return df_sorted['id']
+            else:
+                _list = convert_string_to_list(get_sel)
+                n = len(df_sorted)  # number of rows in the DataFrame
+                sel_list = [n - i for i in _list]  # convert to zero-based indices
+                return df_sorted.iloc[sel_list]['id']
 
 def filter_dataframe(df, df_filter,get_ids=False):
     """
@@ -1006,7 +1008,128 @@ def convert_delta_filter_time():
                     if '-' == time_val[0]:
                         new_val = parse_duration_string(time_val)
                         settings['filters'][i][column_name][bound] = new_val
+def read_budget_files(folder_path='./'):
+    # Initialize an empty list to store DataFrames
+    budgets_dfs = {}
+    month_columns = ['jan','feb','mar','apr','may','jun','jul','aug','sep','okt','nov','dec']
 
+    # List all files in the specified folder
+    files = [f for f in os.listdir(folder_path) if f.lower().startswith('budget') and f.endswith('.csv')]
+
+    # Iterate through each file and read it into a list of DataFrames
+    for file in files:
+        file_path = os.path.join(folder_path, file)
+
+        # Extract the year from the filename (assuming it's in the format "budget_YYYY.csv")
+        year = int(file.lower().split('_')[1].split('.')[0])
+
+        # Read the CSV file into a DataFrame
+        df = pd.DataFrame()
+
+        with open(file_path, 'r') as csv_file:
+            csv_reader = csv.reader(csv_file)
+
+            columns = ['year', 'name', 'categories','category','category_types'] + [f'{month}' for month in month_columns]
+
+            # Iterate through each row and append it to the DataFrame
+            for row in csv_reader:
+                if len(row) and row[0][0] not in '#':
+                    row_data = {
+                        'year': year,
+                        'name': row[0],
+                        'categories': row[1],
+                        # Add other columns as needed
+                    }
+                    row_data.update({f'{month}': 0.0 for month in month_columns})
+                    if len(row) == 14:
+                        row_data.update({f'{month}': float(value) for month, value in zip(month_columns, row[2:])})
+                    elif len(row) == 4:
+                        for mon, val in zip(row[2].split(';'), row[3].split(';')):
+                            if ':' in mon:
+                                if mon[0] == ':':
+                                    mon1 = 1
+                                else:
+                                    mon1 = int(mon.split(':')[0])
+                                if mon[-1] == ':':
+                                    mon2 = 12
+                                else:
+                                    mon2 = int(mon.split(':')[1])
+                                for m in range(mon1-1,mon2):
+                                    row_data[f'{month_columns[m]}'] = float(val)
+                            else:
+                                row_data[f'{month_columns[int(mon)-1]}'] = float(val)
+
+                    df = df.append(row_data, ignore_index=True)
+
+        budgets_dfs[year] = df
+
+    return budgets_dfs
+'''
+def read_budget_files(folder_path='./'):
+    # Initialize an empty list to store budgets
+    budgets = {}
+
+    # List all files in the specified folder
+    files = [f for f in os.listdir(folder_path) if f.lower().startswith('budget') and f.endswith('.csv')]
+
+    # Iterate through each file and read it into a list of dictionaries
+    for file in files:
+        file_path = os.path.join(folder_path, file)
+
+        # Extract the year from the filename (assuming it's in the format "budget_YYYY.csv")
+        year = int(file.lower().split('_')[1].split('.')[0])
+
+        # Read the CSV file into a list of dictionaries
+        with open(file_path, 'r') as csv_file:
+            csv_reader = csv.reader(csv_file)
+
+            # Iterate through each row and populate the dictionary
+            for row in csv_reader:
+                if len(row) and row[0][0] not in '#':
+                    budget = {}
+                    budget['year'] = year
+                    budget['name'] = row[0]
+                    
+                    category_split = row[1].split(',')
+                    category = []
+                    
+                    for cs in category_split:
+                        if len(cs):
+                            try:
+                                category = int(cs)
+                            except ValueError:
+                                category.append(autocomplete_category(categories, cs))
+                                if category[-1] == None:
+                                    print(f'***Error*** Budget {year} - {row[0]} - {category[-1]} was not identified as a category') 
+                        else:
+                            # Loop to add all categories outside after
+                            category = 0
+
+                    budget['categories'] = category
+                    
+                    if len(row) == 14:
+                        budget['values'] = [float(value) for value in row[2:]]
+                    elif len(row) == 4:
+                        budget['values'] = [0.0] * 12
+                        for mon, val in zip(row[2].split(';'), row[3].split(';')):
+                            if ':' in mon:
+                                if mon[0] == ':':
+                                    mon1 = 1
+                                else:
+                                    mon1 = int(mon.split(':')[0])
+                                if mon[-1] == ':':
+                                    mon2 = 12
+                                else:
+                                    mon2 = int(mon.split(':')[1])
+                                for m in range(mon1-1, mon2):
+                                    budget['values'][m] = float(val)
+                            else:
+                                budget['values'][int(mon)-1] = float(val)
+
+                    budgets[year] = budget
+
+    return budgets
+'''
 def print_help(commands,view):
     if commands == 'basic':
         print('Switch views:')
@@ -1122,6 +1245,7 @@ if __name__ == '__main__':
     settings['views'] = view_setting['views']
     categories,auto_categories = import_settings('categories')
     marked = import_settings('marked')
+    budgets = read_budget_files()
 
     convert_delta_filter_time()
     
@@ -1139,6 +1263,10 @@ if __name__ == '__main__':
     '''
     view = {}
     view["view"] = 0
+    #default budget_view
+    view["budget_view"] = ['budget','all',0] #budget/status, 1/2/3 for all/categories/types 0/1 seperate marked
+    #budget_filter
+    view["budget_filter"] = {}
     view["filter"] = 0
     view["page"] = '1'
     # Reset filter to settings filter when reset
@@ -1172,7 +1300,7 @@ if __name__ == '__main__':
             print_help('start',view)
     else:
         print_help('start',view)
-
+    # while loop
     while run:
         _input = input('')
         if len(_input) > 0:
@@ -1395,6 +1523,11 @@ if __name__ == '__main__':
                                             new_dfs = change_dataframe_rows(new_dfs,view,_column,change_ids,_value)
                                     else: skip_update = True
                             else: skip_update = True
+                    # select budget
+                    elif _input.split(' ')[0] == 'b':
+                        budget_year = datetime.now().year
+                        if budget_year in budgets:
+                            view["view"] = budget_year
                     if _input.split(' ')[0] == 'auto':
                         _split = _input.split(' ')
                         if len(_split) > 1:
