@@ -25,11 +25,27 @@ filters[2] = {"key": "ste", "type": "posts",
              "sort2": {"column": "date", "direction": "des"},
              "marked": {"equal": ["Stephanie"]}
             }
-views[3] = {"key": "buo", "type": "budget", "name":"year detail", "group": None,
+views[3] = {"key": "bud", "type": "budget", "name":"Budget {year} det", "group": None,
             "columns": ["name","category","jan","feb","mar","apr","may","jun","jul","aug","sep","okt","nov","dec","tot"],
-            "align": ["l","c","r","r","r","r","r","r","r","r","r","r","r","r"]
+            "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r"]
            }
-filters[3] = {"key": "buo", "type": "budget",
-             "sort": {"column": "name", "direction": "asc"},
-             "sort2": {"column": "", "direction": ""}
+filters[3] = {"key": "bud", "type": "budget",
+             "sort": {"column": "category", "direction": "asc"},
+             "sort2": {"column": "category", "direction": ""}
+             }
+views[4] = {"key": "buo", "type": "budget", "name":"Budget {year} ovw", "group": "category",
+            "columns": ["name","category","jan","feb","mar","apr","may","jun","jul","aug","sep","okt","nov","dec","tot"],
+            "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r"]
+           }
+filters[4] = {"key": "buo", "type": "budget",
+             "sort": {"column": "category", "direction": "asc"},
+             "sort2": {"column": "category", "direction": ""}
+             }
+views[5] = {"key": "bus", "type": "budget status", "name":"Budget {year} sta", "group": "category",
+            "columns": ["name","category","jan","feb","mar","apr","may","jun","jul","aug","sep","okt","nov","dec","tot"],
+            "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r"]
+           }
+filters[5] = {"key": "bus", "type": "budget",
+             "sort": {"column": "category", "direction": "asc"},
+             "sort2": {"column": "category", "direction": ""}
              }
