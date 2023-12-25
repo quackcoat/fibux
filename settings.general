@@ -1,2 +1,3 @@
 view_rows=30
+seperate_marked_in_budget=True
 auto_load=./saved_dataframe.pkl
