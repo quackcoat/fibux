@@ -1,6 +1,6 @@
 *Categories
 # Number for category name. letter for sub category name
-1;Indkomst;income
+1;Indkomst;indkomst
 a;Anden indkomst
 b;Børnepenge
 c;Dagpenge
@@ -9,18 +9,18 @@ e;Løn
 f;Overskydende skat
 g;Renteindtægter
 h;SU & studielån
-2;Husholdning;consumption
+2;Husholdning;forbrug
 a;Apotek
 b;Dagligvarer
 c;Kantine
 d;Kiosk, bager & specialbutikker
-3;Bolig;bills
+3;Bolig;regninger
 a;Andre boligudgifter
 b;Boliglån & husleje
 c;El, vand & varme
-e;Indbo- & familieforsikring
-f;Vedligeholdelse
-4;Transport;bills
+d;Indbo- & familieforsikring
+e;Vedligeholdelse
+4;Transport;regninger
 a;Anden transport
 b;Bilforsikring
 c;Bilkøb & lån
@@ -30,7 +30,7 @@ f;Grøn ejerafgift
 g;Kørselsordning
 h;Parkering
 i;Værksted & reservedele
-5;Øvrige faste;bills
+5;Øvrige faste;regninger
 a;Briller & kontaktlinser
 b;Fagforening & A-kasse
 c;Institutioner
@@ -39,7 +39,7 @@ e;Studieudgifter
 f;Sundheds- & sygeforsikring
 g;Telefoni & internet
 h;TV & streamingstjenester
-6;Privatforbrug;consumption
+6;Privatforbrug;forbrug
 a;Andet
 b;Babyudstyr
 c;Bar, café & restaurant
@@ -59,7 +59,7 @@ p;Spil & legetøj
 q;Sport & fritid
 r;Tobak & alkohol
 s;Tøj & sko
-7;Ferie;consumption
+7;Ferie;forbrug
 a;Billeje
 b;Transport
 c;Ferieaktiviteter
@@ -68,16 +68,16 @@ e;Hotel
 f;Mad
 g;Rejseforsikring
 h;Shopping
-8;Diverse;bills
+8;Diverse;regninger
 a;Bankgebyr
 b;Behandling & læger
 c;Bøder & afgifter
 d;Restskat
-9;Lån;bills
+9;Lån;regninger
 a;Forbrugslån
 b;Privatlån
 c;Studielån
-10;Opsparing;savings
+10;Opsparing;opsparing
 a;Børneopsparing
 b;Opsparingskonto
 c;Pension
