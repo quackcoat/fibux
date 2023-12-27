@@ -1,6 +1,12 @@
-Jakob;2023-1;2023-5;-500
-Jakob;2022-1;2023-5;-2000
-Stephanie;2023-1;2023-5;-2000
+Jakob;2017-1;2018-12;-2000
+Stephanie;2017-1;2018-12;-2000
+Stephanie;2018-2;2018-6;-500
+Jakob;2018-11;2028-12;-1000
+Stephanie;2018-11;2028-12;-1000
+Børn;2020-1;2028-12;-1000
+Stephanie;2020-4;2020-12;-500
+Børn;2020-7;2028-12;-500
+Børn;2021-9;2021-9;-2000
 #
 #Create a function that can read this file and put the data into a dataframe. The rows consists of 4 columns. 1. Name, 2. start date in format m-yyyy, 3. end date in format m-yyyy, 4. value for each month. There should be no calculation in this function. Just put the values to a dataframe in correct formats
 #

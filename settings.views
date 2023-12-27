@@ -14,7 +14,6 @@ views[1] = {"key": "cat","name":"Categories", "type": "posts",
 filters[1] = {"key": "cat", "type": "posts",
              "sort": {"column": "date", "direction": "des"},
              "sort2": {"column": "id", "direction": "des"},
-             "status": {"contains": ["ok"]}
             }
 views[2] = {"key": "ste","name":"Stephanie", "type": "posts",
             "columns": ["id","date","text","category","amount","status"],

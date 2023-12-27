@@ -18,6 +18,16 @@ from pynput.keyboard import Key, Listener
 import readline
 import traceback
 
+def convert_to_bool(i):
+    if isinstance(i,str):
+        if i.lower() == 'true':
+            return True
+        elif i.lower() == 'false':
+            return False
+        else:
+            return i
+    else:
+        return i
 
 def import_settings(_type):
     if _type == 'categories':
@@ -36,10 +46,12 @@ def import_settings(_type):
                 elif line[0] != '#':
                     if _category_input == 'Categories':
                         _split = line.split(';')
-                        if len(_split) == 2:
+                        if len(_split) >= 2:
                             if _split[0].isdigit():
                                 current_category = int(_split[0].strip())
                                 categories[current_category] = {'name': _split[1].strip()}
+                            if len(_split) > 2:
+                                categories[current_category].update({'type': _split[2].strip()})
                             else:
                                 current_subcategory = _split[0].strip()
                                 categories[current_category][current_subcategory] = _split[1].strip()
@@ -154,6 +166,8 @@ def read_csv_file(file_path, headers, csv_sep, csv_encoding, decimal_sep, thousa
 
     # convert value and balance to float
     new_data["value"] = new_data["value"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+    new_data["amount"] = new_data["amount"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+    new_data["category_type"] = pd.to_numeric(new_data["category_type"],errors='coerce')
     new_data["balance"] = new_data["balance"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
     
     return new_data
@@ -238,9 +252,12 @@ def import_data(input_df=None,new=False):
                 new_data = new_data.iloc[i+3:]
                 initial_id = df['id'].iloc[-1] + 1
                 new_data['id'] = range(initial_id,initial_id + len(new_data))
-                new_data['split_id'] = -1
-                new_data['amount'] = new_data['value']
-                new_data['date'] = new_data['posted_date']
+                if 'split_id' not in headers:
+                    new_data['split_id'] = -1
+                if 'amount' not in headers:
+                    new_data['amount'] = new_data['value']
+                if 'date' not in headers:
+                    new_data['date'] = new_data['posted_date']
                 new_data['account'] = _account
 
                 o_sh = df.shape
@@ -268,9 +285,12 @@ def import_data(input_df=None,new=False):
                         account_input = input('New account name: ')
                         if not (df['account'].isin([account_input]).any() and len(account_input) > 0):
                             new_data['id'] = range(len(new_data))
-                            new_data['split_id'] = -1
-                            new_data['amount'] = new_data['value']
-                            new_data['date'] = new_data['posted_date']
+                            if 'split_id' not in headers:
+                                new_data['split_id'] = -1
+                            if 'amount' not in headers:
+                                new_data['amount'] = new_data['value']
+                            if 'date' not in headers:
+                                new_data['date'] = new_data['posted_date']
                             new_data['account'] = account_input
                             if df is None:
                                 df = new_data
@@ -287,9 +307,12 @@ def import_data(input_df=None,new=False):
             if len(account_input) > 0:
                 new_data['id'] = range(len(new_data))
                 df = new_data
-                df['split_id'] = -1
-                df['amount'] = df['value']
-                df['date'] = df['posted_date']
+                if 'split_id' not in headers:
+                    df['split_id'] = -1
+                if 'amount' not in headers:
+                    df['amount'] = df['value']
+                if 'date' not in headers:
+                    df['date'] = df['posted_date']
                 df['account'] = account_input
                 tprint("New dataframe",font="aquaplan")
                 print(new_data)              
@@ -305,14 +328,6 @@ def update_view(df,df_fil,v,categories,get_sel=0):
     # Select correct view
     print_col = settings['views'][v["view"]]['columns']
     align_col = settings['views'][v["view"]]['align']
-    
-    '''
-        print_col = vfil["balance_columns"]
-        align_col = vfil["balance_align"]
-    if v["status"] == "categories":
-        print_col = vfil["categories_columns"]
-        align_col = vfil["categories_align"]
-    '''
     # Set filters based on type
     filters = 0
     # Get filtered dataframe
@@ -361,6 +376,53 @@ def update_view(df,df_fil,v,categories,get_sel=0):
 
     df_sorted = df_filtered.sort_values(by=[sort_col,sort2_col], ascending=[sort_asc,sort2_asc])
 
+    if v['type'] == 'budget':
+        if v['seperate_marked_in_budget']:
+            mar_list = autocomplete_marked(marked)
+            #mar_dic = {index: value for index, value in enumerate(mar_list)}
+            mar_dic = {key: {} for key in mar_list}
+            for _m,_item in marked.items():
+                for start,end,value in zip(_item['start'],_item['end'],_item['value']):
+                    start_date = pd.to_datetime(start, format='%Y-%m')
+                    end_date = pd.to_datetime(end, format='%Y-%m')
+                    date_range = pd.date_range(start=start_date, end=end_date, freq='MS')
+                    for i in range(12):
+                        _date = datetime.strptime(str(i+1)+'-'+str(v['year']), '%m-%Y')
+                        value_sum = 0
+                        if i == 0:
+                            count_dates = sum(date_range < _date)
+                            value_sum += count_dates*value
+                        if _date in date_range:
+                            value_sum += value
+                        _mon = get_months(i+1)
+                        if _mon not in mar_dic[_m]:
+                            mar_dic[_m].update({_mon:value_sum})
+                        else:
+                            new_val = mar_dic[_m][_mon] + value_sum
+                            mar_dic[_m][_mon] = new_val
+            for _m,_item in marked.items():
+                post_df = dfs_history[current_history_index].copy()
+                max_date = datetime.strptime(str(v['year']-1)+'-12-31', '%Y-%m-%d')
+                #min_date = datetime.strptime(str(v['year']-1)+'-12-1', '%Y-%m-%d')
+                marked_filter = {"key": "", "type": "posts","marked":{"equal":[_m],'empty':False},"date":{"max":max_date}}
+                post_filtered = filter_dataframe(post_df, marked_filter)
+                past_years_used = post_filtered['amount'].sum()
+                mar_dic[_m]['jan'] -= past_years_used
+            #new_rows = pd.DataFrame.from_dict({(i, 'name'): j for i, j in mar_dic.items()}, orient='index')
+            # Convert the dictionary to a DataFrame
+            new_rows = pd.DataFrame.from_dict(mar_dic, orient='index')
+            new_rows['category'] = 'Marked'
+
+            # Reset the index and rename the 'index' column to 'name'
+            new_rows = new_rows.reset_index().rename(columns={'index': 'name'})
+            
+            # Create a list of datetimes with a monthly frequency
+            #new_rows = pd.DataFrame({'name': name_values})
+            #df_sorted = pd.concat([new_rows, df_sorted], ignore_index=True)
+            df_sorted = pd.concat([df_sorted,new_rows], ignore_index=True)
+        _month_col = get_months()
+        df_sorted['tot'] = df_sorted[_month_col].sum(axis=1)
+
     pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
     total_length = len(df_sorted)
     # Dataframe to show
@@ -370,16 +432,6 @@ def update_view(df,df_fil,v,categories,get_sel=0):
     if page > pages:
         page = pages
     v["page"] = str(page)
-    '''
-    if page > 1:
-      lloc = (1-page)*int(v["pages"])
-    else:
-      lloc = 1e10
-    if page < pages:
-        floc = (pages - page - 1) * int(v["pages"]) + (total_length % int(v["pages"]))
-    else:
-        flic = 0
-    '''
     if get_sel != 'all':
         if page > 1:
             df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
@@ -398,9 +450,9 @@ def update_view(df,df_fil,v,categories,get_sel=0):
                 category_type = row['category_type']
                 category = row['category']
                 if len(str(category_type)):
-                    if isinstance(category_type,int) or isinstance(category_type,str) or len(category_type.split(',') == 1):
+                    if isinstance(category_type,int) or isinstance(category_type,str):
                         if isinstance(category_type,str):
-                            category_type = int(category_type[0])
+                            category_type = int(category_type.split(',')[0])
                 if len(category) > 0:
                     if isinstance(row["category_type"],str) and len(row["category_type"].split(',')) > 1:
                         unique_types = list(set(row["category_type"].split(',')))
@@ -409,9 +461,11 @@ def update_view(df,df_fil,v,categories,get_sel=0):
                         else:
                             category_name = 'Multiple'
                         # if they are the same as below otherwise Multiple
+                    elif category == 'Marked':
+                        category_name = 'Marked'
                     else:
                         category_name = categories[category_type]['name']
-                    if category_name == 'Multiple':
+                    if category_name == 'Multiple' or category_name == 'Marked':
                         sub_category_name = ''
                     else:
                         if len(category.split(',')) > 1:
@@ -424,51 +478,6 @@ def update_view(df,df_fil,v,categories,get_sel=0):
                         _text = f"{category_name}"
                     #_text = category_name + ' - ' + sub_category_name
                     df_sorted.at[index, 'category'] = _text.strip()
-        if v['type'] == 'budget':
-            if v['seperate_marked_in_budget']:
-                mar_list = autocomplete_marked(marked)
-                #mar_dic = {index: value for index, value in enumerate(mar_list)}
-                mar_dic = {key: {} for key in mar_list}
-                for _m,_item in marked.items():
-                    for start,end,value in zip(_item['start'],_item['end'],_item['value']):
-                        start_date = pd.to_datetime(start, format='%Y-%m')
-                        end_date = pd.to_datetime(end, format='%Y-%m')
-                        date_range = pd.date_range(start=start_date, end=end_date, freq='MS')
-                        for i in range(12):
-                            _date = datetime.strptime(str(i+1)+'-'+str(v['year']), '%m-%Y')
-                            value_sum = 0
-                            if i == 0:
-                                count_dates = sum(date_range < _date)
-                                value_sum += count_dates*value
-                            if _date in date_range:
-                                value_sum += value
-                            _mon = get_months(i+1)
-                            if _mon not in mar_dic[_m]:
-                                mar_dic[_m].update({_mon:value_sum})
-                            else:
-                                new_val = mar_dic[_m][_mon] + value_sum
-                                mar_dic[_m][_mon] = new_val
-                for _m,_item in marked.items():
-                    post_df = dfs_history[current_history_index].copy()
-                    max_date = datetime.strptime(str(v['year']-1)+'-12-31', '%Y-%m-%d')
-                    marked_filter = {"key": "", "type": "posts","marked":{"equal":[_m]},"date":{"max":max_date}}
-                    post_filtered = filter_dataframe(post_df, marked_filter)
-                    past_years_used = post_filtered['amount'].sum()
-                    mar_dic[_m]['jan'] += past_years_used
-                #new_rows = pd.DataFrame.from_dict({(i, 'name'): j for i, j in mar_dic.items()}, orient='index')
-                # Convert the dictionary to a DataFrame
-                new_rows = pd.DataFrame.from_dict(mar_dic, orient='index')
-                new_rows['category'] = 'Marked'
-
-                # Reset the index and rename the 'index' column to 'name'
-                new_rows = new_rows.reset_index().rename(columns={'index': 'name'})
-                
-                # Create a list of datetimes with a monthly frequency
-                #new_rows = pd.DataFrame({'name': name_values})
-                #df_sorted = pd.concat([new_rows, df_sorted], ignore_index=True)
-                df_sorted = pd.concat([df_sorted,new_rows], ignore_index=True)
-            _month_col = get_months()
-            df_sorted['tot'] = df_sorted[_month_col].sum(axis=1)
         if len(df_sorted) > 0:
             float_format = lambda x: f"{x:,.2f}"
             for c in ['amount','value','balance']:
@@ -478,13 +487,18 @@ def update_view(df,df_fil,v,categories,get_sel=0):
             for c in ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','tot']:
                 if c in df_sorted.columns:
                     df_sorted[c] = df_sorted[c].apply(float_format)
-
+        max_col = v['max_col_width']
         df_sorted.loc[:,'select'] = range(len(df_sorted), 0, -1)
         table = pt(list(['select'] + print_col))
-        table._max_width = {col: 32 for col in print_col}
+        table._max_width = {col: max_col for col in print_col}
         for col, align in zip(print_col, align_col):
             table.align[col] = align
         for index,row in df_sorted[['select'] + print_col].iterrows():
+            if not v['show_multiple_lines']:
+                for column in print_col:
+                    if isinstance(row[column],str):
+                        if len(row[column]) > max_col:
+                            row[column] = row[column][:max_col-3] + '...'
             table.add_row(row)
         print('')
         print_header = settings['views'][v['view']]['name'].format(year=v['year'])
@@ -710,26 +724,7 @@ def auto_change_dataframe(df, df_filt,cur_view, auto, input_ids):
         
         #Change all change_ids in mod_df
     return mod_df
-    ''' 
-        #Keep using df for getting ids.
-    new_dfs = auto_change_dataframe(new_dfs,df_filters, view,auto_categories,change_ids)
-    change_ids = update_view(new_dfs, df_filt, cur_view, view_filt,None,'all')
-    # Check if the specified column exists in the DataFrame
-    if column_to_change not in df.columns:
-        raise ValueError(f"Column '{column_to_change}' not found in DataFrame.")
 
-    # Check if the 'id' column exists in both dataframes
-    if 'id' not in df.columns:
-        raise ValueError("Column 'id' not found in DataFrame.")
-    
-    # Get the IDs of the rows to be changed
-    ids_to_change = dataframe_ids.unique()
-
-    # Update the original DataFrame with the modified rows
-    df.loc[df['id'].isin(ids_to_change),column_to_change] = new_value
-
-    return df 
-    '''
 def split_dataframe_rows(df, dataframe_ids, new_value, new_category, new_mark, new_note):
     """
     Splits selected rows of a dataframe by subtracting a new value from the existing value.
@@ -887,8 +882,9 @@ def str_to_datetime(date_string):
 
 def autocomplete_category(categories, string_bit, output='default'):
     if string_bit != '':
-
-        if output == 'comp_list':
+        output2 = output
+        if output == 'comp_list' or output == 'sep_list':
+            output2 = 'list'
             result = []
         # Check if input is in the format of {category}{subcategory}
         count = 0 
@@ -903,21 +899,21 @@ def autocomplete_category(categories, string_bit, output='default'):
                 category = int(category)
                 if category in categories:
                     if subcategory in categories[category]:
-                        if output == 'comp_list':
+                        if output2 == 'list':
                             count += 1
                             result.append(str(category) + subcategory)
-                        elif output == 'default':
+                        elif output2 == 'default':
                             return [category, subcategory]
                     elif subcategory == '':
-                        if output == 'comp_list':
+                        if output2 == 'list':
                             for sub, item in categories[category].items():
-                                if sub != 'name':
+                                if sub != 'name' and sub != 'type':
                                     count += 1
                                     result.append(str(category) + sub)
                 elif category == 0:
                     for cat, item in categories.items():
                         for sub, item in categories[cat].items():
-                            if sub != 'name':
+                            if sub != 'name' and sub != 'type':
                                 count += 1
                                 result.append(str(cat) + sub)
         # Check for matches in category names and subcategory names
@@ -925,16 +921,16 @@ def autocomplete_category(categories, string_bit, output='default'):
             for category, subcategories in categories.items():
                 for subcategory, name in subcategories.items():
                     if string_bit.lower() in name.lower():
-                        if subcategory != 'name': 
+                        if subcategory != 'name' and subcategory != 'type':
                             count += 1
-                            if output == 'comp_list':
+                            if output2 == 'list':
                                 result.append(str(category) + subcategory)
-                            elif output == 'default':
+                            elif output2 == 'default':
                                 result = [category, subcategory]
                         else:
-                            if output == 'comp_list':
+                            if output2 == 'list':
                                 for subcategory, name in subcategories.items():
-                                    if subcategory != 'name': 
+                                    if subcategory != 'name' and subcategory != 'type':
                                         count += 1
                                         result.append(str(category) + subcategory)
         if count == 0:
@@ -943,6 +939,15 @@ def autocomplete_category(categories, string_bit, output='default'):
             return result
         elif output == 'comp_list':
             return result
+        elif output == 'sep_list':
+            result1 = []
+            result2 = []
+            
+            # Iterate through the original list and split each string
+            for item in result:
+                result1.append(item[:-1])
+                result2.append(item[-1])
+            return result1,result2
         else:
             print(f'{count} matches found for {string_bit}')
         for category, subcategories in categories.items():
@@ -1138,6 +1143,7 @@ def get_months(_i='all'):
     elif isinstance(_i,str):
         if _i.isdigit():
             return _all[int(_i)-1]
+
 def read_budget_files(folder_path='./'):
     # Initialize an empty dictionary to store DataFrames
     budgets_dfs = {}
@@ -1165,47 +1171,70 @@ def read_budget_files(folder_path='./'):
                 all_type = ''
                 all_type_list = []
                 all_cat_list = []
+                all_auto_cat_list = []
                 cat_sort = ''
                 if len(row) and row[0][0] not in '#':
                     for cat in row[1].split(';'):
-                        cat_value_list = autocomplete_category(categories,cat,output='comp_list')
-                        if not cat_value_list == None:
-                            for cat2 in cat_value_list:
-                                _t = int(cat2[:len(cat2)-1])
-                                _c = cat[-1]
-                                all_type += cat2[:len(cat2)-1]+','
-                                all_type_list.append(cat2[:len(cat2)-1])
-                                all_cat_list.append(cat2[-1])
-                                all_category += cat2[-1]+','
-                                cat_sort += "{:02d}".format(_t) + _c + ','
-                    unique_types = list(set(all_type_list))
-                    unique_cat = list(set(all_cat_list))
-                    if len(unique_types) > 1:
-                        cat_sort = '!'+cat_sort
-                    elif len(unique_cat) > 1:
-                        ins_pos = len(str(unique_types[0]))
-                        cat_sort = cat_sort[:2] + '0' + cat_sort[2:]
-                    if len(all_type)>1:
-                        all_type = all_type[:-1]
-                    if len(all_category)>1:
-                        all_category = all_category[:-1]
+                        if cat[0] != '-':
+                            cat_value_list = autocomplete_category(categories,cat,output='comp_list')
+                            if not cat_value_list == None:
+                                for cat2 in cat_value_list:
+                                    _t = int(cat2[:len(cat2)-1])
+                                    _c = cat[-1]
+                                    all_type += cat2[:len(cat2)-1]+','
+                                    all_type_list.append(cat2[:len(cat2)-1])
+                                    all_cat_list.append(cat2[-1])
+                                    all_category += cat2[-1]+','
+                                    cat_sort += "{:02d}".format(_t) + _c + ','
+                        else:
+                            all_auto_cat_list.append(cat)
+                            cat_sort += row[1]
                     _id += 1
-                    row_data = {
-                        'year': year,
-                        'name': row[0],
-                        'categories': row[1],
-                        'category_type': all_type,
-                        'category': all_category,
-                        'category_sort': cat_sort,
-                        'tot': 0,
-                        'id': _id,
-                        # Add other columns as needed
-                    }
+                    if len(all_auto_cat_list) == 0:
+                        unique_types = list(set(all_type_list))
+                        unique_cat = list(set(all_cat_list))
+                        if len(unique_types) > 1:
+                            cat_sort = '!'+cat_sort
+                        elif len(unique_cat) > 1:
+                            ins_pos = len(str(unique_types[0]))
+                            cat_sort = cat_sort[:2] + '0' + cat_sort[2:]
+                        if len(all_type)>1:
+                            all_type = all_type[:-1]
+                        if len(all_category)>1:
+                            all_category = all_category[:-1]
+                        row_data = {
+                            'year': year,
+                            'name': row[0],
+                            'categories': row[1],
+                            'category_type': all_type,
+                            'category': all_category,
+                            'category_sort': cat_sort,
+                            'tot': 0,
+                            'id': _id,
+                            # Add other columns as needed
+                        }
+                    else:
+                        row_data = {
+                            'year': year,
+                            'name': row[0],
+                            'categories': row[1],
+                            'category_type': '',
+                            'category': '',
+                            'category_sort': '!' + cat_sort,
+                            'tot': 0,
+                            'id': _id,
+                            # Add other columns as needed
+                        }
                     row_data.update({f'{month}': 0.0 for month in month_columns})
                     if len(row) == 14:
                         row_data.update({f'{month}': float(value) for month, value in zip(month_columns, row[2:])})
                     elif len(row) == 4:
-                        for mon, val in zip(row[2].split(';'), row[3].split(';')):
+                        for mon, ind in zip(row[2].split(';'), range(1000)):
+                            values = row[3].split(';')
+                            if ind >= len(values):
+                                val = values[-1]
+                            else:
+                                val = values[ind]
                             if ':' in mon:
                                 if mon[0] == ':':
                                     mon1 = 1
@@ -1224,8 +1253,58 @@ def read_budget_files(folder_path='./'):
                     #    tot_val += row_data[f'{month}'] 
                     #row_data['tot'] = tot_val
                     dfs.append(row_data)
-            for row in csv_reader:
-                negative numbers should get remaining categories
+            # Iterate through each key in the dictionary
+            other_cat_type_list = []
+            other_cat_sub_list = []
+            for other_values in dfs:
+                other_cat_type_list.extend(other_values.get('category_type', '').split(','))
+                other_cat_sub_list.extend(other_values.get('category', '').split(','))
+
+            zero_id = -1
+            for values in dfs:
+                # Check if the 'category' key exists and its first character is '-'
+                if 'category' in values and len(values['categories']) and values['categories'][0] == '-':
+                    cat_type_list,cat_sub_list = autocomplete_category(categories,values['categories'][1:],output='sep_list')
+                    if values['categories'][1:] == '0':
+                        zero_id = values['id']
+                    else:
+                        # Check if the combination exists in other parts
+                        for cat_type,cat_sub in zip(cat_type_list,cat_sub_list):
+                            found = False
+                            for other_cat_type,other_cat_sub in zip(other_cat_type_list,other_cat_sub_list):
+                                if cat_type == other_cat_type and cat_sub == other_cat_sub:
+                                    found = True
+                                    break
+                            if not found:
+                                if values['category_type']:
+                                    values['category_type'] += ',' + cat_type
+                                else:
+                                    values['category_type'] = cat_type
+                                if values['category']:
+                                    values['category'] += ',' + cat_sub
+                                else:
+                                    values['category'] = cat_sub
+                                other_cat_type_list.append(cat_type) 
+                                other_cat_sub_list.append(cat_sub) 
+            if zero_id >= 0:
+                for values in dfs:
+                    if values['id'] == zero_id:
+                        cat_type_list,cat_sub_list = autocomplete_category(categories,'0',output='sep_list')
+                        for cat_type,cat_sub in zip(cat_type_list,cat_sub_list):
+                            found = False
+                            for other_cat_type,other_cat_sub in zip(other_cat_type_list,other_cat_sub_list):
+                                if cat_type == other_cat_type and cat_sub == other_cat_sub:
+                                    found = True
+                                    break
+                            if not found:
+                                if values['category_type']:
+                                    values['category_type'] += ',' + cat_type
+                                else:
+                                    values['category_type'] = cat_type
+                                if values['category']:
+                                    values['category'] += ',' + cat_sub
+                                else:
+                                    values['category'] = cat_sub
 
         # Create a DataFrame from the list of dictionaries
         df = pd.DataFrame(dfs)
@@ -1254,28 +1333,8 @@ def group_and_sum_rows(df, group_level=1):
         'jun': 'sum', 'jul': 'sum', 'aug': 'sum', 'sep': 'sum', 'oct': 'sum',
         'nov': 'sum', 'dec': 'sum', 'tot': 'sum',
         'name': lambda x: ', '.join(x),
-        'id': lambda x: ', '.join(x.astype(str))
+        'id': 'first'
     })
-
-    # Merge the grouped DataFrame with the original DataFrame to keep all rows
-    #result_df = pd.merge(df, grouped_df, on=group_columns, how='left')
-
-    # For rows where 'category_sort' starts with 0, copy the original values without summing
-    #grouped_df.loc[mask_starts_with_zero, ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec', 'tot']] = \
-    #grouped_df.loc[mask_starts_with_zero, ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec', 'tot']].values
-    #grouped_df.loc[mask_starts_with_zero, 'name'] = df.loc[mask_starts_with_zero, 'name'].values
-
-    # Rearrange the columns
-    #grouped_df = grouped_df[['id', 'year_y', 'name', 'categories_y', 'category_type',
-    #                       'category_sort_y', 'jan', 'feb', 'mar', 'apr', 'may',
-    #                       'jun', 'jul', 'aug', 'sep', 'okt', 'nov',
-    #                       'dec', 'tot']]
-
-    # Rename the summed columns
-    #$grouped_df.rename(columns={'year_y': 'year', 'categories_y': 'categories', 'category_sort_y': 'category_sort',
-    #$                          'jan': 'jan', 'feb': 'feb', 'mar': 'mar', 'apr': 'apr', 'may': 'may',
-    #$                          'jun': 'jun', 'jul': 'jul', 'aug': 'aug', 'sep': 'sep', 'okt': 'okt',
-    #$                          'nov': 'nov', 'dec': 'dec', 'tot': 'tot'}, inplace=True)
     grouped_df.rename(columns={'year': 'year', 'categories_y': 'categories', 'category_sort_y': 'category_sort',
                               'jan': 'jan', 'feb': 'feb', 'mar': 'mar', 'apr': 'apr', 'may': 'may',
                               'jun': 'jun', 'jul': 'jul', 'aug': 'aug', 'sep': 'sep', 'oct': 'oct',
@@ -1305,13 +1364,6 @@ def budget_status(df,post_df):
     for index, row in df.iterrows():
         year = row['year']
         for month in ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']:
-            #Current:{'key': 'cat', 'type': 'posts', 'sort': {'column': 'date', 'direction': 'des'},
-            #         'sort2': {'column': 'id', 'direction': 'des'}, 'status': {'contains': ['ok']},
-            #         'date': {'min': datetime.datetime(2023, 1, 5, 0, 0), 'max': datetime.datetime(2023, 1, 12, 0, 0)},
-            #         'category': {'equal': ['4b', '3d'], 'not_empty': True}
-            #         }
-
-
             _mon = month_mapping.get(month)
             filt = filters_ini.copy()
             date1 = datetime(year,_mon,1)
@@ -1447,18 +1499,6 @@ if __name__ == '__main__':
 
     convert_delta_filter_time()
     
-    '''
-    view_filter = {}
-    view_filter["rows"] = settings["view_rows"]
-    view_filter["balance_sort"] = settings["view_balance_sort"]
-    view_filter["balance_columns"] = settings["view_balance_columns"]
-    view_filter["balance_align"] = settings["view_balance_align"]
-    view_filter["categories_sort"] = settings["view_categories_sort"]
-    view_filter["categories_columns"] = settings["view_categories_columns"]
-    view_filter["categories_align"] = settings["view_categories_align"]
-    #same filters
-    # date,text,value,timestamp
-    '''
     view = {}
     view["view"] = 0
     #default budget_view
@@ -1467,15 +1507,12 @@ if __name__ == '__main__':
     view["budget_filter"] = {}
     view["filter"] = 0
     view["type"] = settings['filters'][view["filter"]]["type"]
-    view["seperate_marked_in_budget"] = bool(settings.get("seperate_marked_in_budget",True))
-    #import_folder = import_settings.get("import_folder", None)
+    view["seperate_marked_in_budget"] = convert_to_bool(settings.get("seperate_marked_in_budget",True))
+    view["max_col_width"] = int(settings.get("max_col_width",'32'))
+    view["show_multiple_lines"] = convert_to_bool(settings.get("show_multiple_lines",True))
     view["page"] = '1'
     view["year"] = 0
-    # Reset filter to settings filter when reset
-    # Define filter using a view key
-    #view["pages"] = settings["view_rows"]
     
-    #df_default_filter = {'balance_sort':{'column':view_filter["balance_sort"],'direction':'des'},'categories_sort':{'column':view_filter["categories_sort"],'direction':'des'}}
     df_filters = settings['filters'][view["filter"]].copy()
     dfs_history = []
     current_history_index = 0
@@ -1560,6 +1597,7 @@ if __name__ == '__main__':
                         cur_df = None
                         current_history_index = 0
                         skip_update = True
+                    print('Ok')
                 if _input in 'wl':
                     pkl_path = pickle_file_path
                     if _input == 'w':
@@ -1881,7 +1919,7 @@ if __name__ == '__main__':
                             cur_df = group_and_sum_rows(cur_df,1)
                 elif len(dfs_history) and view['type'] == 'plots':
                     cur_df = dfs_history[current_history_index].copy()
-                if len(cur_df):
+                if cur_df != None and len(cur_df):
                     view = update_view(cur_df,df_filters,view,categories)
                 warn_message.append(f"Change command and try again.")
                 warn_message.append('')
