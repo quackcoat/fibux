@@ -20,7 +20,7 @@ views[2] = {"key": "ste","name":"Stephanie", "type": "posts",
             "align": ["c","c","l","l","r","c"]
            }
 filters[2] = {"key": "ste", "type": "posts",
-             "sort": {"column": "status", "direction": "des"},
+             "sort": {"column": "status", "direction": "asc"},
              "sort2": {"column": "date", "direction": "des"},
              "marked": {"equal": ["Stephanie"]}
             }
@@ -29,7 +29,7 @@ views[3] = {"key": "bud", "type": "budget", "name":"Budget {year} det", "group":
             "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r","r"]
            }
 filters[3] = {"key": "bud", "type": "budget",
-             "sort": {"column": "category", "direction": "asc"},
+             "sort": {"column": "id", "direction": "asc"},
              "sort2": {"column": "category", "direction": ""}
              }
 views[4] = {"key": "buo", "type": "budget", "name":"Budget {year} ovw", "group": "category",
@@ -37,14 +37,14 @@ views[4] = {"key": "buo", "type": "budget", "name":"Budget {year} ovw", "group":
             "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r","r"]
            }
 filters[4] = {"key": "buo", "type": "budget",
-             "sort": {"column": "category", "direction": "asc"},
+             "sort": {"column": "id", "direction": "asc"},
              "sort2": {"column": "category", "direction": ""}
              }
 views[5] = {"key": "bus", "type": "budget status", "name":"Budget {year} sta", "group": "category",
             "columns": ["name","category","jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec","tot"],
             "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r","r"]
            }
-filters[5] = {"key": "bus", "type": "budget",
-             "sort": {"column": "category", "direction": "asc"},
+filters[5] = {"key": "bus", "type": "budget status",
+             "sort": {"column": "id", "direction": "asc"},
              "sort2": {"column": "category", "direction": ""}
              }

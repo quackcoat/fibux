@@ -88,12 +88,16 @@ b;Kontooverførsel
 c;Udlæg
 *Auto category
 # columns to change = category,marked,date. columns to filter for = text,amount,notes. Use comma to search for multiple values.
-marked=jakob;info=XXXX 1056,XXXX1056
-marked=stephanie;info=XXXX 1130,XXXX1130
-category=løn;text=lønoverførsel
+marked=jakob;info=XXXX 1056,XXXX1056,XXXX 9890,XXXX9890
+marked=stephanie;info=XXXX 1130,XXXX1130,XXXX 9700,XXXX9700
+category=løn;date=first;text=lønoverførsel,månedsløn
 category=feriepenge;text=feriepenge
-cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,lidl,aldi,coop
+cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,lidl,aldi,coop,føtex,normal
 cat=apotek;marked=;text=apotek
+category=boliglån;marked=;date=first;text=totalkredit
 category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa
 category=fastfood;text=pizza,just-eat,burger
+category=elektronik;text=power,elgiganten,proshop
+category=møbler;text=biltema
+category=software;text=google play,apple.com,apps
 category=brændstof;text=q8,ingo,circle,f24

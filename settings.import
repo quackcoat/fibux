@@ -1,9 +1,9 @@
 csv_encoding=latin-1
 text_encoding=utf-8
 text_decoding=latin-1
-headers=[id,text,posted_date,value,balance,amount,date,category_type,category,marked,splid_id]
-csv_sep=,
-decimal_sep=.
-thousand_sep=;
-date_format=%Y-%m-%d
-import_folder=/home/jakob/repos/fibux2
+headers=[posted_date,text,value,balance,info,ignore]
+csv_sep=;
+decimal_sep=,
+thousand_sep=.
+date_format=%d-%m-%Y
+import_folder=/home/jakob/Downloads
