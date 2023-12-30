@@ -130,6 +130,18 @@ def import_settings(_type):
                 views_out.append(v)
         settings['views'] = views_out
         return settings
+    elif _type == 'export':
+        settings = {}
+        setting_output = ''
+        with open("settings." + _type) as f:
+            for line in f:
+                if len(line) > 6 and line[:7].lower() == 'output=':
+                    setting_output = line.split('=')[1].strip() 
+                    if setting_output not in settings:
+                        settings[setting_output] = []
+                elif line[0] != '#':
+                    settings[setting_output].append(line.strip())
+        return settings
     else:
         settings = {}
         with open("settings." + _type) as f:
@@ -159,6 +171,7 @@ def get_newest_csv_file(import_folder):
 def read_csv_file(file_path, headers, csv_sep, csv_encoding, decimal_sep, thousand_sep):
     # read csv file
     new_data = pd.read_csv(file_path, sep=csv_sep, header=None, names=headers, dtype=str, encoding=csv_encoding)
+    new_data = new_data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
     # Remove the 'ignore' column if it exists
     if 'ignore' in new_data.columns:
@@ -166,8 +179,10 @@ def read_csv_file(file_path, headers, csv_sep, csv_encoding, decimal_sep, thousa
 
     # convert value and balance to float
     new_data["value"] = new_data["value"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
-    new_data["amount"] = new_data["amount"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
-    new_data["category_type"] = pd.to_numeric(new_data["category_type"],errors='coerce')
+    if 'amount' in new_data:
+        new_data["amount"] = new_data["amount"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+    if 'category_type' in new_data:
+        new_data["category_type"] = pd.to_numeric(new_data["category_type"],errors='coerce')
     new_data["balance"] = new_data["balance"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
     
     return new_data
@@ -376,7 +391,7 @@ def update_view(df,df_fil,v,categories,get_sel=0):
 
     df_sorted = df_filtered.sort_values(by=[sort_col,sort2_col], ascending=[sort_asc,sort2_asc])
 
-    if v['type'] == 'budget':
+    if 'budget' in v['type']:
         if v['seperate_marked_in_budget']:
             mar_list = autocomplete_marked(marked)
             #mar_dic = {index: value for index, value in enumerate(mar_list)}
@@ -412,6 +427,7 @@ def update_view(df,df_fil,v,categories,get_sel=0):
             # Convert the dictionary to a DataFrame
             new_rows = pd.DataFrame.from_dict(mar_dic, orient='index')
             new_rows['category'] = 'Marked'
+            new_rows['year'] = v['year']
 
             # Reset the index and rename the 'index' column to 'name'
             new_rows = new_rows.reset_index().rename(columns={'index': 'name'})
@@ -421,6 +437,23 @@ def update_view(df,df_fil,v,categories,get_sel=0):
             #df_sorted = pd.concat([new_rows, df_sorted], ignore_index=True)
             df_sorted = pd.concat([df_sorted,new_rows], ignore_index=True)
         _month_col = get_months()
+
+    if v["type"] == 'budget status':
+        if v['year'] == datetime.now().year:
+            cur_mon = datetime.now().month
+            _month_col = get_months(range(1,cur_mon+1))
+        post_dfs = dfs_history[current_history_index].copy()
+        if get_sel != 0:
+            if len(get_sel) != 0:
+                get_sel_num = get_sel[0]
+                if len(get_sel) > 1:
+                    get_sel_mon = (get_sel[1])
+                else:
+                    get_sel_mon = 'all'
+            df_sorted = budget_status(df_sorted,post_dfs,v,[get_sel_num,get_sel_mon])
+        else:
+            df_sorted = budget_status(df_sorted,post_dfs,v)
+    if 'budget' in v['type']:
         df_sorted['tot'] = df_sorted[_month_col].sum(axis=1)
 
     pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
@@ -507,14 +540,15 @@ def update_view(df,df_fil,v,categories,get_sel=0):
         print("Page " + str(page) + " of " + str(pages))
         return v
     else:
-        # Get and return row number
-        if get_sel == 'all':
-            return df_sorted['id']
-        else:
-            _list = convert_string_to_list(get_sel)
-            n = len(df_sorted)  # number of rows in the DataFrame
-            sel_list = [n - i for i in _list]  # convert to zero-based indices
-            return df_sorted.iloc[sel_list]['id']
+        if v['type'] == 'posts':
+            # Get and return row number
+            if get_sel == 'all':
+                return df_sorted['id']
+            else:
+                _list = convert_string_to_list(get_sel)
+                n = len(df_sorted)  # number of rows in the DataFrame
+                sel_list = [n - i for i in _list]  # convert to zero-based indices
+                return df_sorted.iloc[sel_list]['id']
 
 def filter_dataframe(df, df_filter,get_ids=False):
     """
@@ -687,10 +721,12 @@ def change_dataframe_rows(df,v , column_to_change, dataframe_ids, new_value):
     
     # Get the IDs of the rows to be changed
     ids_to_change = dataframe_ids.unique()
-
-    # Update the original DataFrame with the modified rows
-    df.loc[df['id'].isin(ids_to_change),column_to_change] = new_value
-    df.loc[df['id'].isin(ids_to_change),'changed'] = pd.to_datetime(datetime.now())
+    if new_value == 'first' and column_to_change == 'date':
+        df.loc[df['id'].isin(ids_to_change),column_to_change] = df.loc[df['id'].isin(ids_to_change),'posted_date'] + pd.offsets.MonthBegin(1) 
+    else:
+        # Update the original DataFrame with the modified rows
+        df.loc[df['id'].isin(ids_to_change),column_to_change] = new_value
+        df.loc[df['id'].isin(ids_to_change),'changed'] = pd.to_datetime(datetime.now())
 
     return df 
 
@@ -705,7 +741,7 @@ def auto_change_dataframe(df, df_filt,cur_view, auto, input_ids):
         change_ids = combined_ids[combined_ids.duplicated()]
         for _c,_v in auto_value['change'].items():
            _value = convert_value_to_data_type(df,cur_view,_c,_v)
-           if _value is not None:
+           if _value is not None or _v == 'first':
                if _c == 'category':
                    if _v != '':
                        _v = autocomplete_category(categories,_v)
@@ -912,8 +948,11 @@ def autocomplete_category(categories, string_bit, output='default'):
                                     result.append(str(category) + sub)
                 elif category == 0:
                     for cat, item in categories.items():
+                        _type = ''
                         for sub, item in categories[cat].items():
-                            if sub != 'name' and sub != 'type':
+                            if sub == 'type':
+                                _type = item
+                            if sub != 'name' and sub != 'type' and _type != 'ignore':
                                 count += 1
                                 result.append(str(cat) + sub)
         # Check for matches in category names and subcategory names
@@ -1143,6 +1182,13 @@ def get_months(_i='all'):
     elif isinstance(_i,str):
         if _i.isdigit():
             return _all[int(_i)-1]
+        elif _i in _all:
+            return _all.index(_i) + 1
+    elif isinstance(_i,list) or isinstance(_i,range):
+        output = []
+        for __i in _i:
+            output.append(_all[__i-1])
+        return output
 
 def read_budget_files(folder_path='./'):
     # Initialize an empty dictionary to store DataFrames
@@ -1344,39 +1390,47 @@ def group_and_sum_rows(df, group_level=1):
 
     return result_df
                 
-def budget_status(df,post_df):
-    month_mapping = {
-    'jan': 1,
-    'feb': 2,
-    'mar': 3,
-    'apr': 4,
-    'may': 5,
-    'jun': 6,
-    'jul': 7,
-    'aug': 8,
-    'sep': 9,
-    'oct': 10,
-    'nov': 11,
-    'dec': 12
-    }
+def budget_status(df,post_df,v,get_sel=0):
+    if isinstance(get_sel,list):
+        get_sel_num = get_sel[0]
+        get_sel_mon = get_months(get_sel[1])
+        pages = m.ceil(len(df)/int(settings["view_rows"]))
+        total_length = len(df)
+        page = int(v["page"]) 
+        #rev_loc = int(get_sel_num) + (page-1)*(pages)
+        get_index = len(df) - int(get_sel_num) + (page-1)*(pages)
+        
     filters_ini = {"key": "", "type": "posts"}
     # Loop over each row in the DataFrame and update budget values
+    _month_col = get_months()
     for index, row in df.iterrows():
-        year = row['year']
-        for month in ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']:
-            _mon = month_mapping.get(month)
+        year = int(row['year'])
+        for month in _month_col:
+            _mon = get_months(month)
             filt = filters_ini.copy()
             date1 = datetime(year,_mon,1)
             _, last_day = calendar.monthrange(year, _mon)
             date2 = datetime(year,_mon,last_day)
             filt['date'] = {'min': date1,'max':date2}
-            cat = []
-            for _typ,_cat in zip(row['category_type'].split(','),row['category'].split(',')):
-                cat.append(str(_typ) + _cat)
-            filt['category'] = {'equal': cat, 'not_empty':True}
+            if not v['seperate_marked_in_budget'] or row['category'] != 'Marked':
+                cat = []
+                for _typ,_cat in zip(row['category_type'].split(','),row['category'].split(',')):
+                    cat.append(str(_typ) + _cat)
+                filt['category'] = {'equal': cat, 'not_empty':True}
+                if v['seperate_marked_in_budget']:
+                    filt['marked'] = {'empty': True, 'not_empty':False}
+            else:
+                filt['marked'] = {'equal': [row['name']], 'not_empty':True}
             filter_post_df = filter_dataframe(post_df, filt)
+            if isinstance(get_sel,list):
+                if month in get_sel_mon:
+                    if index == get_index:
+                        print(f'Month {month}, {len(filter_post_df)} posts')
+                        if len(filter_post_df):
+                            print(filter_post_df[['date','text','amount','category_type','category']])
             post_sum = filter_post_df['amount'].sum()
             df.at[index, month] = post_sum - df.at[index, month]
+    df['tot'] = df[_month_col].sum(axis=1)
 
     return df 
 
@@ -1495,6 +1549,7 @@ if __name__ == '__main__':
     settings['views'] = view_setting['views']
     categories,auto_categories = import_settings('categories')
     marked = import_settings('marked')
+    export = import_settings('export')
     budgets = read_budget_files()
 
     convert_delta_filter_time()
@@ -1568,9 +1623,11 @@ if __name__ == '__main__':
                         cur_df = budgets[view["year"]]
                         if view["group"] == 'category':
                             cur_df = group_and_sum_rows(cur_df,1)
+                            '''
                             if view["type"] == 'budget status':
                                 post_dfs = dfs_history[current_history_index].copy()
-                                cur_df = budget_status(cur_df,post_dfs)
+                                cur_df = budget_status(cur_df,post_dfs,view)
+                            '''
                     else:              
                         warn_message.append(f'Budget {view["year"]} not found')
                         cur_df = None
@@ -1644,6 +1701,8 @@ if __name__ == '__main__':
                     if cur_df is None:
                         skip_update = True
                         warn_message.append('Import canceled')
+                elif _input == 'e':
+                    A = 1
                 if _input[0] in 'pcfshdb' or _input.split(' ')[0] == 'auto' :
                     if _input[0] == 'h':
                         print_help('basic',view)
@@ -1718,35 +1777,39 @@ if __name__ == '__main__':
                         if len(_split) == 1:
                             print_help('detail',view)
                         else:
-                            change_ids = update_view(cur_df,df_filters,view,None,_split[1])
-                            print(len(change_ids))
-                            if len(change_ids) == 1:
-                                print()
-                                print('***Imported/fixed data columns')
-                                print(f'id: ' + str(cur_df.loc[change_ids,'id'].values[0]))
-                                print(f'posted_date: ' + str(cur_df.loc[change_ids,'posted_date'].dt.strftime('%d %b %Y').values[0]))
-                                print(f'text: ' + cur_df.loc[change_ids,'text'].values[0])
-                                print(f'value: ' + str(cur_df.loc[change_ids,'value'].values[0]))
-                                print(f'balance: ' + str(cur_df.loc[change_ids,'balance'].values[0]))
-                                print(f'account: ' + cur_df.loc[change_ids,'account'].values[0])
-                                print(f'info: ' + cur_df.loc[change_ids,'info'].values[0])
-                                print(f'imported: ' + str(cur_df.loc[change_ids,'imported'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
-                                print('***Category/changable data')
-                                print(f'date: ' + str(cur_df.loc[change_ids,'date'].dt.strftime('%d %b %Y').values[0]))
-                                cat_typ = cur_df.loc[change_ids,'category_type'].values[0]
-                                cat = cur_df.loc[change_ids,'category'].values[0]
-                                print(f'category_type: ' + str(cat_typ))
-                                print(f'category: ' + cat)
-                                if cat_typ != '':
-                                    category_name = categories[cat_typ]['name']
-                                    sub_category_name = categories[cat_typ][cat]
-                                    print(f'Category display name: {category_name} - {sub_category_name}')
-                                print(f'amount: ' + str(cur_df.loc[change_ids,'amount'].values[0]))
-                                print(f'split_id: ' + str(cur_df.loc[change_ids,'split_id'].values[0]))
-                                print(f'marked: ' + cur_df.loc[change_ids,'marked'].values[0])
-                                print(f'notes: ' + cur_df.loc[change_ids,'notes'].values[0])
-                                print(f'status: ' + cur_df.loc[change_ids,'status'].values[0])
-                                print(f'changed: ' + str(cur_df.loc[change_ids,'changed'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
+                            if view['type'] == 'posts':
+                                change_ids = update_view(cur_df,df_filters,view,None,_split[1])
+                                print(len(change_ids))
+                                if len(change_ids) == 1:
+                                    print()
+                                    print('***Imported/fixed data columns')
+                                    print(f'id: ' + str(cur_df.loc[change_ids,'id'].values[0]))
+                                    print(f'posted_date: ' + str(cur_df.loc[change_ids,'posted_date'].dt.strftime('%d %b %Y').values[0]))
+                                    print(f'text: ' + cur_df.loc[change_ids,'text'].values[0])
+                                    print(f'value: ' + str(cur_df.loc[change_ids,'value'].values[0]))
+                                    print(f'balance: ' + str(cur_df.loc[change_ids,'balance'].values[0]))
+                                    print(f'account: ' + cur_df.loc[change_ids,'account'].values[0])
+                                    print(f'info: ' + cur_df.loc[change_ids,'info'].values[0])
+                                    print(f'imported: ' + str(cur_df.loc[change_ids,'imported'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
+                                    print('***Category/changable data')
+                                    print(f'date: ' + str(cur_df.loc[change_ids,'date'].dt.strftime('%d %b %Y').values[0]))
+                                    cat_typ = cur_df.loc[change_ids,'category_type'].values[0]
+                                    cat = cur_df.loc[change_ids,'category'].values[0]
+                                    print(f'category_type: ' + str(cat_typ))
+                                    print(f'category: ' + cat)
+                                    if cat_typ != '':
+                                        category_name = categories[cat_typ]['name']
+                                        sub_category_name = categories[cat_typ][cat]
+                                        print(f'Category display name: {category_name} - {sub_category_name}')
+                                    print(f'amount: ' + str(cur_df.loc[change_ids,'amount'].values[0]))
+                                    print(f'split_id: ' + str(cur_df.loc[change_ids,'split_id'].values[0]))
+                                    print(f'marked: ' + cur_df.loc[change_ids,'marked'].values[0])
+                                    print(f'notes: ' + cur_df.loc[change_ids,'notes'].values[0])
+                                    print(f'status: ' + cur_df.loc[change_ids,'status'].values[0])
+                                    print(f'changed: ' + str(cur_df.loc[change_ids,'changed'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
+                            elif view['type'] == 'budget status':
+                                change_ids = update_view(cur_df,df_filters,view,None,_split[1:])
+                                #skip_update = True
                             else:
                                 print('Only 1 selection allowed')
                         skip_update = True
@@ -1910,6 +1973,7 @@ if __name__ == '__main__':
                 traceback_str = traceback.format_exc()
                 # Print or log the traceback string
                 warn_message.append(f"Error: {traceback_str}")
+                '''
                 if view["type"][:min(6,len(view["type"]))] == 'budget':
                     if view["year"] == 0:
                         view["year"] = datetime.now().year
@@ -1917,10 +1981,17 @@ if __name__ == '__main__':
                         cur_df = budgets[view["year"]]
                         if view["group"] == 'category':
                             cur_df = group_and_sum_rows(cur_df,1)
-                elif len(dfs_history) and view['type'] == 'plots':
-                    cur_df = dfs_history[current_history_index].copy()
-                if cur_df != None and len(cur_df):
-                    view = update_view(cur_df,df_filters,view,categories)
+                '''
+                try:
+                    if len(dfs_history) and view['type'] == 'plots':
+                        cur_df = dfs_history[current_history_index].copy()
+                except Exception as e:
+                    traceback_str = traceback.format_exc()
+                try:
+                    if cur_df != None and len(cur_df):
+                        view = update_view(cur_df,df_filters,view,categories)
+                except Exception as e:
+                    traceback_str = traceback.format_exc()
                 warn_message.append(f"Change command and try again.")
                 warn_message.append('')
             for w in warn_message: print(w)
