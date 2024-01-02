@@ -135,8 +135,8 @@ def import_settings(_type):
         setting_output = ''
         with open("settings." + _type) as f:
             for line in f:
-                if len(line) > 6 and line[:7].lower() == 'output=':
-                    setting_output = line.split('=')[1].strip() 
+                if len(line) > 6 and line[:7].lower() == 'output:':
+                    setting_output = line.split(':')[1].strip() 
                     if setting_output not in settings:
                         settings[setting_output] = []
                 elif line[0] != '#':
@@ -339,57 +339,68 @@ def import_data(input_df=None,new=False):
     else:
         return None
 
-def update_view(df,df_fil,v,categories,get_sel=0):
+def create_output(df,df_fil,v,categories,output_method=0):
     # Select correct view
     print_col = settings['views'][v["view"]]['columns']
+    if v["type"] == 'budget status':
+        if v['year'] == datetime.now().year:
+            cur_mon = datetime.now().month
+            if cur_mon < 12:
+                rem_month_col = get_months(range(cur_mon+1,13))
+                for rem_mon in rem_month_col:
+                    if rem_mon in print_col:
+                        print_col.remove(rem_mon)
     align_col = settings['views'][v["view"]]['align']
     # Set filters based on type
     filters = 0
     # Get filtered dataframe
     df_filtered = filter_dataframe(df, df_fil)
-    #Sort
-    sort2_col = ''
-    sort_dir = 'des'
-    sort2_dir = 'des'
-    if 'sort' in df_fil and 'column' in df_fil['sort']:
-        sort_col = df_fil['sort']['column']
-    else:
-        sort_col = ''
-    if 'sort2' in df_fil and 'column' in df_fil['sort2']:
-        sort2_col = df_fil['sort2']['column']
-    else:
+    if df_fil != None:
+        #Sort
         sort2_col = ''
-    if 'sort' in df_fil and 'direction' in df_fil['sort']:
-        sort_dir = df_fil['sort']['direction']
-    else:
-        sort_dir = ''
-    if 'sort2' in df_fil and 'direction' in df_fil['sort2']:
-        sort2_dir = df_fil['sort2']['direction']
-    else:
-        sort2_dir = ''
-    if len(sort_col) == 0:
-        if 'name' in df_filtered:
-            sort_col = 'name'
-        else:
-            sort_col = 'posted_date'
-    if len(sort2_col) == 0:
-        sort2_col = 'id'
-    if len(sort2_dir) == 0:
+        sort_dir = 'des'
         sort2_dir = 'des'
-    if sort_dir != 'des':
-        sort_asc = False
-    else:
-        sort_asc = True
-    if sort2_dir != 'des':
-        sort2_asc = False
-    else:
-        sort2_asc = True
-    if sort_col == 'category':
-        sort_col = 'category_sort'
-    if sort2_col == 'category':
-        sort2_col = 'category_sort'
+        if 'sort' in df_fil and 'column' in df_fil['sort']:
+            sort_col = df_fil['sort']['column']
+        else:
+            sort_col = ''
+        if 'sort2' in df_fil and 'column' in df_fil['sort2']:
+            sort2_col = df_fil['sort2']['column']
+        else:
+            sort2_col = ''
+        if 'sort' in df_fil and 'direction' in df_fil['sort']:
+            sort_dir = df_fil['sort']['direction']
+        else:
+            sort_dir = ''
+        if 'sort2' in df_fil and 'direction' in df_fil['sort2']:
+            sort2_dir = df_fil['sort2']['direction']
+        else:
+            sort2_dir = ''
+        if len(sort_col) == 0:
+            if 'name' in df_filtered:
+                sort_col = 'name'
+            else:
+                sort_col = 'posted_date'
+        if len(sort2_col) == 0:
+            sort2_col = 'id'
+        if len(sort2_dir) == 0:
+            sort2_dir = 'des'
+        if sort_dir != 'des':
+            sort_asc = False
+        else:
+            sort_asc = True
+        if sort2_dir != 'des':
+            sort2_asc = False
+        else:
+            sort2_asc = True
+        if sort_col == 'category':
+            sort_col = 'category_sort'
+        if sort2_col == 'category':
+            sort2_col = 'category_sort'
 
-    df_sorted = df_filtered.sort_values(by=[sort_col,sort2_col], ascending=[sort_asc,sort2_asc])
+        df_sorted = df_filtered.sort_values(by=[sort_col,sort2_col], ascending=[sort_asc,sort2_asc])
+    else:
+        df_sorted = df_filtered.copy()
 
     if 'budget' in v['type']:
         if v['seperate_marked_in_budget']:
@@ -442,36 +453,43 @@ def update_view(df,df_fil,v,categories,get_sel=0):
         if v['year'] == datetime.now().year:
             cur_mon = datetime.now().month
             _month_col = get_months(range(1,cur_mon+1))
+            all_months = get_months()
+            if len(_month_col) != len(all_months):
+                for column_to_remove in all_months[len(_month_col):]:
+                    df_sorted = df_sorted.drop(columns=[column_to_remove])
         post_dfs = dfs_history[current_history_index].copy()
-        if get_sel != 0:
-            if len(get_sel) != 0:
-                get_sel_num = get_sel[0]
-                if len(get_sel) > 1:
-                    get_sel_mon = (get_sel[1])
+        if output_method == 'df':
+            df_sorted = budget_status(df_sorted,post_dfs,v,output_method)
+        elif output_method != 0:
+            if len(output_method) != 0:
+                output_method_num = output_method[0]
+                if len(output_method) > 1:
+                    output_method_mon = (output_method[1])
                 else:
-                    get_sel_mon = 'all'
-            df_sorted = budget_status(df_sorted,post_dfs,v,[get_sel_num,get_sel_mon])
+                    output_method_mon = 'all'
+            df_sorted = budget_status(df_sorted,post_dfs,v,[output_method_num,output_method_mon])
         else:
             df_sorted = budget_status(df_sorted,post_dfs,v)
     if 'budget' in v['type']:
         df_sorted['tot'] = df_sorted[_month_col].sum(axis=1)
 
-    pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
-    total_length = len(df_sorted)
-    # Dataframe to show
-    page = int(v["page"]) 
-    if page < 1:
-        page = 1
-    if page > pages:
-        page = pages
-    v["page"] = str(page)
-    if get_sel != 'all':
-        if page > 1:
-            df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
-        if page < pages: 
-            df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
+    if output_method != 'df' and output_method != 'table':
+        pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
+        total_length = len(df_sorted)
+        # Dataframe to show
+        page = int(v["page"]) 
+        if page < 1:
+            page = 1
+        if page > pages:
+            page = pages
+        v["page"] = str(page)
+        if output_method != 'all':
+            if page > 1:
+                df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
+            if page < pages: 
+                df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
     
-    if get_sel == 0:
+    if output_method == 0 or output_method == 'df' or output_method == 'table':
         if 'posted_date' in df_sorted:
             df_sorted['posted_date'] = df_sorted['posted_date'].dt.strftime('%d %b %Y')
         if 'date' in df_sorted:
@@ -511,7 +529,7 @@ def update_view(df,df_fil,v,categories,get_sel=0):
                         _text = f"{category_name}"
                     #_text = category_name + ' - ' + sub_category_name
                     df_sorted.at[index, 'category'] = _text.strip()
-        if len(df_sorted) > 0:
+        if len(df_sorted) > 0 and (output_method == 0 or output_method == 'table'):
             float_format = lambda x: f"{x:,.2f}"
             for c in ['amount','value','balance']:
                 if c in df_sorted.columns:
@@ -521,31 +539,38 @@ def update_view(df,df_fil,v,categories,get_sel=0):
                 if c in df_sorted.columns:
                     df_sorted[c] = df_sorted[c].apply(float_format)
         max_col = v['max_col_width']
-        df_sorted.loc[:,'select'] = range(len(df_sorted), 0, -1)
-        table = pt(list(['select'] + print_col))
+        if output_method == 'df':
+            return df_sorted
+        if output_method != 'table':
+            df_sorted.loc[:,'select'] = range(len(df_sorted), 0, -1)
+            print_col = list(['select'] + print_col)
+        table = pt(print_col)
         table._max_width = {col: max_col for col in print_col}
         for col, align in zip(print_col, align_col):
             table.align[col] = align
-        for index,row in df_sorted[['select'] + print_col].iterrows():
+        for index,row in df_sorted[print_col].iterrows():
             if not v['show_multiple_lines']:
                 for column in print_col:
                     if isinstance(row[column],str):
                         if len(row[column]) > max_col:
                             row[column] = row[column][:max_col-3] + '...'
             table.add_row(row)
-        print('')
-        print_header = settings['views'][v['view']]['name'].format(year=v['year'])
-        tprint(print_header,font="aquaplan")
-        print(table)
-        print("Page " + str(page) + " of " + str(pages))
-        return v
+        if output_method == 0:
+            print('')
+            print_header = settings['views'][v['view']]['name'].format(year=v['year'])
+            tprint(print_header,font="aquaplan")
+            print(table)
+            print("Page " + str(page) + " of " + str(pages))
+            return v
+        elif output_method == 'table':
+            return table
     else:
         if v['type'] == 'posts':
             # Get and return row number
-            if get_sel == 'all':
+            if output_method == 'all':
                 return df_sorted['id']
             else:
-                _list = convert_string_to_list(get_sel)
+                _list = convert_string_to_list(output_method)
                 n = len(df_sorted)  # number of rows in the DataFrame
                 sel_list = [n - i for i in _list]  # convert to zero-based indices
                 return df_sorted.iloc[sel_list]['id']
@@ -562,65 +587,19 @@ def filter_dataframe(df, df_filter,get_ids=False):
         pd.DataFrame: A filtered dataframe based on filter values.
     """
     filtered_df = df.copy()
-    for column_name, column_filter in df_filter.items():
-        if column_name not in df.columns:
-            continue  # Ignore filters for non-existing columns
-        column_type = df[column_name].dtype
-        if column_type == 'object':  # string column
-            contains = column_filter.get('contains', None)
-            equal = column_filter.get('equal', None)
-            empty = column_filter.get('empty', False)
-            not_empty = column_filter.get('not_empty', True)
+    if df_filter != None:
+        for column_name, column_filter in df_filter.items():
+            if column_name not in df.columns:
+                continue  # Ignore filters for non-existing columns
+            column_type = df[column_name].dtype
+            if column_type == 'object':  # string column
+                contains = column_filter.get('contains', None)
+                equal = column_filter.get('equal', None)
+                empty = column_filter.get('empty', False)
+                not_empty = column_filter.get('not_empty', True)
 
-            # Handle multiple 'contains' values
-            if contains is not None:
-                filtered_dfs = []
-                if not not_empty:
-                    filtered = filtered_df[filtered_df[column_name] == '']
-                    filtered_dfs.append(filtered)
-                else:
-                    if empty:
-                        filtered = filtered_df[filtered_df[column_name] == '']
-                        filtered_dfs.append(filtered)
-                    if len(contains) > 0:
-                        if isinstance(contains, list):
-                            contains_condition = filtered_df[column_name].str.contains('|'.join(contains), case=False, na=False)
-                        else:
-                            contains_condition = filtered_df[column_name].str.contains(contains, case=False, na=False)
-                        filtered = filtered_df.loc[contains_condition]
-                        filtered_dfs.append(filtered)
-                filtered_df = pd.concat(filtered_dfs,ignore_index=False)
-            elif equal is not None or not not_empty:
-                if column_name == 'category':
-                    filtered_dfs = []
-                    if not not_empty:
-                        filtered = filtered_df[filtered_df['category'] == '']
-                        filtered_dfs.append(filtered)
-                    else:
-                        cat_index = []
-                        if len(equal) > 0:
-                            filtered_dfs = []
-                            for eq_cat in equal:
-                                filtered = filtered_df[(filtered_df['category_type'] == int(eq_cat[:-1])) & (filtered_df['category'] == eq_cat[-1])]
-                                filtered_dfs.append(filtered)
-                            if empty:
-                                filtered = filtered_df[filtered_df['category'] == '']
-                                filtered_dfs.append(filtered)
-                    filtered_df = pd.concat(filtered_dfs,ignore_index=False)
-                elif column_name == 'marked':
-                    filtered_dfs = []
-                    if not not_empty:
-                        filtered = filtered_df[filtered_df['marked'] == '']
-                        filtered_dfs.append(filtered)
-                    else:
-                        for eq_mar in equal:
-                            filtered = filtered_df[filtered_df['marked'] == eq_mar]
-                            filtered_dfs.append(filtered)
-                        if empty:
-                            filtered = filtered_df[filtered_df['marked'] == '']
-                            filtered_dfs.append(filtered)
-                    filtered_df = pd.concat(filtered_dfs,ignore_index=False)
-                else:
+                # Handle multiple 'contains' values
+                if contains is not None:
                     filtered_dfs = []
                     if not not_empty:
                         filtered = filtered_df[filtered_df[column_name] == '']
@@ -629,23 +608,70 @@ def filter_dataframe(df, df_filter,get_ids=False):
                         if empty:
                             filtered = filtered_df[filtered_df[column_name] == '']
                             filtered_dfs.append(filtered)
-                        filtered_df = filtered_df.loc[filtered_df[column_name].str.equal(equal)]
-                        filtered_dfs.append(filtered)
+                        if len(contains) > 0:
+                            if isinstance(contains, list):
+                                contains_condition = filtered_df[column_name].str.contains('|'.join(contains), case=False, na=False)
+                            else:
+                                contains_condition = filtered_df[column_name].str.contains(contains, case=False, na=False)
+                            filtered = filtered_df.loc[contains_condition]
+                            filtered_dfs.append(filtered)
                     filtered_df = pd.concat(filtered_dfs,ignore_index=False)
-        elif column_type == 'datetime64[ns]':  # datetime column
-            lower_bound = column_filter.get('min', None)
-            upper_bound = column_filter.get('max', None)
-            if lower_bound is not None:
-                filtered_df = filtered_df.loc[filtered_df[column_name] >= lower_bound]
-            if upper_bound is not None:
-                filtered_df = filtered_df.loc[filtered_df[column_name] <= upper_bound]
-        else:  # numeric column
-            lower_bound = column_filter.get('min', None)
-            upper_bound = column_filter.get('max', None)
-            if lower_bound is not None:
-                filtered_df = filtered_df.loc[filtered_df[column_name] >= float(lower_bound)]
-            if upper_bound is not None:
-                filtered_df = filtered_df.loc[filtered_df[column_name] <= float(upper_bound)]
+                elif equal is not None or not not_empty:
+                    if column_name == 'category':
+                        filtered_dfs = []
+                        if not not_empty:
+                            filtered = filtered_df[filtered_df['category'] == '']
+                            filtered_dfs.append(filtered)
+                        else:
+                            cat_index = []
+                            if len(equal) > 0:
+                                filtered_dfs = []
+                                for eq_cat in equal:
+                                    filtered = filtered_df[(filtered_df['category_type'] == int(eq_cat[:-1])) & (filtered_df['category'] == eq_cat[-1])]
+                                    filtered_dfs.append(filtered)
+                                if empty:
+                                    filtered = filtered_df[filtered_df['category'] == '']
+                                    filtered_dfs.append(filtered)
+                        filtered_df = pd.concat(filtered_dfs,ignore_index=False)
+                    elif column_name == 'marked':
+                        filtered_dfs = []
+                        if not not_empty:
+                            filtered = filtered_df[filtered_df['marked'] == '']
+                            filtered_dfs.append(filtered)
+                        else:
+                            for eq_mar in equal:
+                                filtered = filtered_df[filtered_df['marked'] == eq_mar]
+                                filtered_dfs.append(filtered)
+                            if empty:
+                                filtered = filtered_df[filtered_df['marked'] == '']
+                                filtered_dfs.append(filtered)
+                        filtered_df = pd.concat(filtered_dfs,ignore_index=False)
+                    else:
+                        filtered_dfs = []
+                        if not not_empty:
+                            filtered = filtered_df[filtered_df[column_name] == '']
+                            filtered_dfs.append(filtered)
+                        else:
+                            if empty:
+                                filtered = filtered_df[filtered_df[column_name] == '']
+                                filtered_dfs.append(filtered)
+                            filtered_df = filtered_df.loc[filtered_df[column_name].str.equal(equal)]
+                            filtered_dfs.append(filtered)
+                        filtered_df = pd.concat(filtered_dfs,ignore_index=False)
+            elif column_type == 'datetime64[ns]':  # datetime column
+                lower_bound = column_filter.get('min', None)
+                upper_bound = column_filter.get('max', None)
+                if lower_bound is not None:
+                    filtered_df = filtered_df.loc[filtered_df[column_name] >= lower_bound]
+                if upper_bound is not None:
+                    filtered_df = filtered_df.loc[filtered_df[column_name] <= upper_bound]
+            else:  # numeric column
+                lower_bound = column_filter.get('min', None)
+                upper_bound = column_filter.get('max', None)
+                if lower_bound is not None:
+                    filtered_df = filtered_df.loc[filtered_df[column_name] >= float(lower_bound)]
+                if upper_bound is not None:
+                    filtered_df = filtered_df.loc[filtered_df[column_name] <= float(upper_bound)]
     if not get_ids: 
         return filtered_df
     else:
@@ -736,7 +762,7 @@ def auto_change_dataframe(df, df_filt,cur_view, auto, input_ids):
         mod_filt = df_filt.copy()
         for _c,_v in auto_value['search'].items():
             mod_filt = change_filter(mod_filt,_c,_v)
-        filter_ids = update_view(df, mod_filt, cur_view,None,'all')
+        filter_ids = create_output(df, mod_filt, cur_view,None,'all')
         combined_ids = pd.concat([input_ids, filter_ids],ignore_index=True)
         change_ids = combined_ids[combined_ids.duplicated()]
         for _c,_v in auto_value['change'].items():
@@ -1390,21 +1416,24 @@ def group_and_sum_rows(df, group_level=1):
 
     return result_df
                 
-def budget_status(df,post_df,v,get_sel=0):
-    if isinstance(get_sel,list):
-        get_sel_num = get_sel[0]
-        get_sel_mon = get_months(get_sel[1])
+def budget_status(df,post_df,v,output_method=0):
+    if isinstance(output_method,list):
+        output_method_num = output_method[0]
+        output_method_mon = get_months(output_method[1])
         pages = m.ceil(len(df)/int(settings["view_rows"]))
         total_length = len(df)
         page = int(v["page"]) 
-        #rev_loc = int(get_sel_num) + (page-1)*(pages)
-        get_index = len(df) - int(get_sel_num) + (page-1)*(pages)
+        #rev_loc = int(output_method_num) + (page-1)*(pages)
+        get_index = len(df) - int(output_method_num) + (page-1)*(pages)
         
     filters_ini = {"key": "", "type": "posts"}
     # Loop over each row in the DataFrame and update budget values
     _month_col = get_months()
     for index, row in df.iterrows():
         year = int(row['year'])
+        if year == datetime.now().year:
+            cur_mon = datetime.now().month
+            _month_col = get_months(range(1,cur_mon+1))
         for month in _month_col:
             _mon = get_months(month)
             filt = filters_ini.copy()
@@ -1422,8 +1451,8 @@ def budget_status(df,post_df,v,get_sel=0):
             else:
                 filt['marked'] = {'equal': [row['name']], 'not_empty':True}
             filter_post_df = filter_dataframe(post_df, filt)
-            if isinstance(get_sel,list):
-                if month in get_sel_mon:
+            if isinstance(output_method,list):
+                if month in output_method_mon:
                     if index == get_index:
                         print(f'Month {month}, {len(filter_post_df)} posts')
                         if len(filter_post_df):
@@ -1433,6 +1462,109 @@ def budget_status(df,post_df,v,get_sel=0):
     df['tot'] = df[_month_col].sum(axis=1)
 
     return df 
+
+def set_view_and_filter(_input_key,_settings,_view,_df_filter={}):
+    for fil,i in zip(_settings['filters'],range(len(_settings['filters']))):
+        if 'key' in fil:
+            if _input_key == fil['key']:
+                _df_filter = fil.copy()
+                break
+    for vie,i in zip(_settings['views'],range(len(_settings['views']))):
+        if 'key' in vie:
+            if _input_key == vie['key']:
+                _view["type"] = vie['type']
+                _view["view"] = i
+                _view["page"] = '1'
+                if 'group' in vie: 
+                    _view["group"] = vie['group']
+                else:
+                    _view["group"] = None
+                break
+    if len(_df_filter) and _view["type"] != _df_filter["type"]:
+        _df_filter = {}
+    if _view["type"][:min(6,len(_view["type"]))] == 'budget':
+        if _view["year"] == 0:
+            _view["year"] = datetime.now().year
+        if _view["year"] in budgets:
+            _cur_df = budgets[_view["year"]].copy()
+            if _view["group"] == 'category':
+                _cur_df = group_and_sum_rows(_cur_df,1)
+                '''
+                if view["type"] == 'budget status':
+                    post_dfs = dfs_history[current_history_index].copy()
+                    cur_df = budget_status(cur_df,post_dfs,view)
+                '''
+        else:              
+            warn_message.append(f'Budget {view["year"]} not found')
+            _cur_df = None
+            skip_update = True
+    elif len(dfs_history) and _view['type'] == 'posts':
+        _cur_df = dfs_history[current_history_index].copy()
+    return _cur_df,_df_filter,_view
+
+def set_filter(filter_input,existing_filter={}):
+    _split = filter_input.split(' ')
+    if len(_split) == 1: 
+        if _split[0][:min(3,len(_split[0]))] == 'res':
+            existing_filter = settings['filters'][view['filter']].copy()
+    if len(_split) == 2: 
+        if _split[0] == 'del':
+            _column = find_column(_split[1])
+            if _column in existing_filter:
+                del existing_filter[_column]
+        elif _split[0] in ['sor','sor2','sort','sort2']:
+            if _split[0][-1] != '2':
+                sort_name = 'sort'
+            else:
+                sort_name = 'sort2'
+            if _split[1] == 'asc' or _split[1] == 'des':
+                if _split[0][-1] != '2':
+                    existing_filter[sort_name]['direction'] = _split[1]
+                else:
+                    existing_filter[sort_name]['direction'] = _split[1]
+            else:
+                _column = find_column(_split[1])
+                if _column is not None:
+                   if existing_filter[sort_name]['column'] != _column:
+                       existing_filter[sort_name]['column'] = _column
+                   else:
+                       if existing_filter[sort_name]['direction'] == 'des':
+                           existing_filter[sort_name]['direction'] = 'asc'
+                       else:
+                           existing_filter[sort_name]['direction'] = 'des'
+        else:
+            _column = find_column(_split[0])
+            existing_filter = change_filter(existing_filter,_column,_split[1])
+    return existing_filter
+
+def evaluate_textstring(template, variable_dict):
+    """
+    Replace placeholders in the template string with variable values.
+
+    Args:
+    - template (str): The template string with placeholders.
+    - variable_dict (dict): A dictionary containing variable names and values.
+
+    Returns:
+    - str: The formatted string.
+    """
+    # Use eval to evaluate expressions within curly braces
+    def eval_expression(match):
+        expression = match.group(1)
+        try:
+            #return str(eval(expression, variable_dict))
+            return f"{eval(expression, variable_dict):,.0f}"
+        except Exception as e:
+            print(f"Error evaluating expression '{expression}': {e}")
+            return match.group(0)
+
+    # Use regular expressions to find expressions within curly braces
+    import re
+    pattern = re.compile(r'\{([^}]+)\}')
+
+    # Replace placeholders with evaluated expressions
+    formatted_string = pattern.sub(eval_expression, template)
+    return formatted_string
 
 def print_help(commands,view):
     if commands == 'basic':
@@ -1566,7 +1698,14 @@ if __name__ == '__main__':
     view["max_col_width"] = int(settings.get("max_col_width",'32'))
     view["show_multiple_lines"] = convert_to_bool(settings.get("show_multiple_lines",True))
     view["page"] = '1'
+    cur_year = datetime.now().year
     view["year"] = 0
+    if cur_year in budgets:
+        view["year"] = cur_year
+    elif len(budgets) > 0:
+        highest_year = max(budgets, key=budgets.get)
+        if highest_year > 2000: 
+            view["year"] = highest_year
     
     df_filters = settings['filters'][view["filter"]].copy()
     dfs_history = []
@@ -1585,7 +1724,7 @@ if __name__ == '__main__':
         if os.path.exists(pickle_file_path):
             print(f'Loading dataframe from {os.path.abspath(pickle_file_path)}')
             cur_df = pd.read_pickle(pickle_file_path)
-            view = update_view(cur_df,df_filters,view,categories)
+            view = create_output(cur_df,df_filters,view,categories)
             print(f'Loaded dataframe from {os.path.abspath(pickle_file_path)}')
             dfs_history.append(cur_df.copy())
             print_help('basic',view)
@@ -1598,42 +1737,7 @@ if __name__ == '__main__':
         _input = input('')
         if len(_input) > 0:
             try:
-                for fil,i in zip(settings['filters'],range(len(settings['filters']))):
-                    if 'key' in fil:
-                        if _input == fil['key']:
-                            df_filters = fil
-                            break
-                for vie,i in zip(settings['views'],range(len(settings['views']))):
-                    if 'key' in vie:
-                        if _input == vie['key']:
-                            view["type"] = vie['type']
-                            view["view"] = i
-                            view["page"] = '1'
-                            if 'group' in vie: 
-                                view["group"] = vie['group']
-                            else:
-                                view["group"] = None
-                            break
-                if len(df_filters) and view["type"] != df_filters["type"]:
-                    df_filters = {}
-                if view["type"][:min(6,len(view["type"]))] == 'budget':
-                    if view["year"] == 0:
-                        view["year"] = datetime.now().year
-                    if view["year"] in budgets:
-                        cur_df = budgets[view["year"]]
-                        if view["group"] == 'category':
-                            cur_df = group_and_sum_rows(cur_df,1)
-                            '''
-                            if view["type"] == 'budget status':
-                                post_dfs = dfs_history[current_history_index].copy()
-                                cur_df = budget_status(cur_df,post_dfs,view)
-                            '''
-                    else:              
-                        warn_message.append(f'Budget {view["year"]} not found')
-                        cur_df = None
-                        skip_update = True
-                elif len(dfs_history) and view['type'] == 'posts':
-                    cur_df = dfs_history[current_history_index].copy()
+                cur_df,df_filters,view = set_view_and_filter(_input,settings,view,df_filters)
                 if _input in 'ur':
                     if view["type"] == 'plots':
                         if _input.lower() == 'u':
@@ -1702,7 +1806,77 @@ if __name__ == '__main__':
                         skip_update = True
                         warn_message.append('Import canceled')
                 elif _input == 'e':
-                    A = 1
+                    for output,item in export.items():
+                        export_text = []
+                        variables = {}
+                        for _item in item:
+                            _type = _item.split(':')[0]
+                            _input = _item[len(_type)+1:]
+                            if _type == 'text':
+                                _string = evaluate_textstring(_input, variables)
+                                export_text.append(_string)
+                                print(_string)
+                            else: 
+                                _input_split = _input.split(';')
+                                par_type = _input_split[0]
+                                export_view = view
+                                export_view['type'] = par_type
+                                export_view['year'] = datetime.now().year
+                                name = ''
+                                _id = ''
+                                value = ''
+                                return_value = -99999999999
+                                export_filter = {}
+                                for _par in _input_split[1:]:
+                                    par_input_type = _par.split('=')[0]
+                                    par_input_input = _par.split('=')[1]
+                                    if par_input_type == 'key':
+                                        export_df,export_filter,export_view = set_view_and_filter(par_input_input,settings,export_view)
+                                    elif par_input_type == 'name':
+                                        name = par_input_input
+                                    elif par_input_type == 'id':
+                                        _id = par_input_input
+                                    elif par_input_type == 'value':
+                                        value = par_input_input
+                                    elif par_input_type == 'year':
+                                        export_view["year"] = int(par_input_input)
+                                    elif par_input_type == 'filter':
+                                        export_filter = set_filter(par_input_input,export_filter)
+                                if _type != 'df':
+                                    export_df = create_output(export_df,export_filter,export_view,categories,'df')
+                                else:
+                                    table_df = create_output(export_df,export_filter,export_view,categories,'table')
+                                if par_type == 'budget':
+                                    if 'current_month' == value:
+                                        _column = get_months(datetime.now().month)
+                                        if len(name) > 0:
+                                            return_value = export_df.loc[export_df['name'] == name, _column].values[0]
+                                        if len(_id) > 0:
+                                            return_value = export_df.loc[export_df['id'] == _id, _column].values[0]
+                                    elif 'current_month_sum' == value:
+                                        _column_sum = get_months(range(1,datetime.now().month+1))
+                                        if len(name) > 0:
+                                            return_value = export_df.loc[export_df['name'] == name, _column_sum].sum(axis=1).values[0]
+                                        if len(_id) > 0:
+                                            return_value = export_df.loc[export_df['id'] == _id, _column_sum].sum(axis=1).values[0]
+                                    else:
+                                        _column_sum = value
+                                        if len(name) > 0:
+                                            return_value = export_df.loc[export_df['name'] == name, _column_sum].sum(axis=1).values[0]
+                                        if len(_id) > 0:
+                                            return_value = export_df.loc[export_df['id'] == _id, _column_sum].sum(axis=1).values[0]
+                                elif par_type == 'posts':
+                                    if 'sum' in value:
+                                        return_value = export_df[value.split('.')[0]].sum()
+                                if _type == 'df':
+                                    export_text.append(table_df)
+                                if par_type != 'df':
+                                    variables[_type] = return_value
+                        with open(output, 'w') as file:
+                            for string_item in export_text:
+                                file.write(f"{string_item}\n")
+
+                        A = 1
                 if _input[0] in 'pcfshdb' or _input.split(' ')[0] == 'auto' :
                     if _input[0] == 'h':
                         print_help('basic',view)
@@ -1734,43 +1908,15 @@ if __name__ == '__main__':
                     # select filters
                     if _input.split(' ')[0] == 'f':
                         _split = _input.split(' ')
+                        filter_input = _input[len(_split[0])+1:]
                         if len(_split) == 1:
                             print_help('filter',view)
                             print()
                             print('Current:')
                             print(df_filters)
                             skip_update = True
-                        if len(_split) == 2: 
-                            if _split[1][:min(3,len(_split[1]))] == 'res':
-                                df_filters = settings['filters'][view['filter']].copy()
-                        if len(_split) == 3: 
-                            if _split[1] == 'del':
-                                _column = find_column(_split[2])
-                                if _column in df_filters:
-                                    del df_filters[_column]
-                            elif _split[1] in ['sor','sor2','sort','sort2']:
-                                if _split[1][-1] != '2':
-                                    sort_name = 'sort'
-                                else:
-                                    sort_name = 'sort2'
-                                if _split[2] == 'asc' or _split[2] == 'des':
-                                    if _split[1][-1] != '2':
-                                        df_filters[sort_name]['direction'] = _split[2]
-                                    else:
-                                        df_filters[sort_name]['direction'] = _split[2]
-                                else:
-                                    _column = find_column(_split[2])
-                                    if _column is not None:
-                                       if df_filters[sort_name]['column'] != _column:
-                                           df_filters[sort_name]['column'] = _column
-                                       else:
-                                           if df_filters[sort_name]['direction'] == 'des':
-                                               df_filters[sort_name]['direction'] = 'asc'
-                                           else:
-                                               df_filters[sort_name]['direction'] = 'des'
-                            else:
-                                _column = find_column(_split[1])
-                                df_filters = change_filter(df_filters,_column,_split[2])
+                        else:
+                            df_filter = set_filter(filter_input,df_filter)
                     # select detail
                     if _input.split(' ')[0] == 'd':
                         _split = _input.split(' ')
@@ -1778,7 +1924,7 @@ if __name__ == '__main__':
                             print_help('detail',view)
                         else:
                             if view['type'] == 'posts':
-                                change_ids = update_view(cur_df,df_filters,view,None,_split[1])
+                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
                                 print(len(change_ids))
                                 if len(change_ids) == 1:
                                     print()
@@ -1808,7 +1954,7 @@ if __name__ == '__main__':
                                     print(f'status: ' + cur_df.loc[change_ids,'status'].values[0])
                                     print(f'changed: ' + str(cur_df.loc[change_ids,'changed'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
                             elif view['type'] == 'budget status':
-                                change_ids = update_view(cur_df,df_filters,view,None,_split[1:])
+                                change_ids = create_output(cur_df,df_filters,view,None,_split[1:])
                                 #skip_update = True
                             else:
                                 print('Only 1 selection allowed')
@@ -1823,7 +1969,7 @@ if __name__ == '__main__':
                         elif len(_split) >= 4 or _input.split(' ')[0] == 'cd':
                             _column = find_column(_split[2],False)
                             if _column is not None:
-                                change_ids = update_view(cur_df,df_filters,view,None,_split[1])
+                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
                                 if len(change_ids) > 0:
                                     if _input.split(' ')[0] == 'cd':
                                         _value = ''
@@ -1862,7 +2008,7 @@ if __name__ == '__main__':
                             id_sel = _split[1]
                         else:
                             id_sel = 'all'
-                        change_ids = update_view(cur_df,df_filters,view,None,id_sel)
+                        change_ids = create_output(cur_df,df_filters,view,None,id_sel)
                         cur_df = auto_change_dataframe(cur_df,df_filters, view,auto_categories,change_ids)
                         dataframe_update = True
                     # Split
@@ -1873,12 +2019,12 @@ if __name__ == '__main__':
                             skip_update = True
                         elif len(_split) >= 3 or _input.split(' ')[0] == 'sd': 
                             if _input.split(' ')[0] == 'sd':
-                                change_ids = update_view(cur_df,df_filters,view,None,_split[1])
+                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
                                 if len(change_ids) > 0:
                                     cur_df = delete_split_dataframe_rows(cur_df, change_ids)
                                 else: skip_update = True
                             else:
-                                change_ids = update_view(cur_df,df_filters,view,None,_split[1])
+                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
                                 if len(change_ids) > 0:
                                     new_value = float(_split[2])
                                     if new_value is not None and new_value != 0:
@@ -1954,7 +2100,7 @@ if __name__ == '__main__':
                     #Update view
                     a = 0
                 if not skip_update:
-                    view = update_view(cur_df,df_filters,view,categories)
+                    view = create_output(cur_df,df_filters,view,categories)
                 else:
                     skip_update = False
                 if dataframe_update:
@@ -1989,7 +2135,7 @@ if __name__ == '__main__':
                     traceback_str = traceback.format_exc()
                 try:
                     if cur_df != None and len(cur_df):
-                        view = update_view(cur_df,df_filters,view,categories)
+                        view = create_output(cur_df,df_filters,view,categories)
                 except Exception as e:
                     traceback_str = traceback.format_exc()
                 warn_message.append(f"Change command and try again.")
