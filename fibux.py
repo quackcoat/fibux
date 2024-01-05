@@ -17,6 +17,7 @@ from art import *
 from pynput.keyboard import Key, Listener
 import readline
 import traceback
+import shlex
 
 def convert_to_bool(i):
     if isinstance(i,str):
@@ -60,11 +61,15 @@ def import_settings(_type):
                         search_criteria = {}
                         _split = line.split(';')
                         auto_categories.append({'change':{},'search':{}})
+                        split_characters = ['>', '<', '=']
                         for _spi in _split:
-                            column = find_column(_spi.split('=')[0])
-                            value = _spi.split('=')[1].strip()
-                            if column in ['category','marked','date']:
+                            column = find_column(re.split(f'[{"".join(split_characters)}]', _spi)[0])
+                            split_character = next(char for char in _spi if char in split_characters)
+                            value = _spi.split(split_character)[1].strip()
+                            if column in ['category','marked','date','notes']:
                                 auto_categories[-1]['change'][column] = value
+                            elif column in ['value']:
+                                auto_categories[-1]['search'][column] = split_character + value
                             elif column in ['text','posted_date','info']:
                                 auto_categories[-1]['search'][column] = value
 
@@ -342,6 +347,7 @@ def import_data(input_df=None,new=False):
 def create_output(df,df_fil,v,categories,output_method=0):
     # Select correct view
     print_col = settings['views'][v["view"]]['columns']
+    print_col_align = settings['views'][v["view"]]['columns']
     if v["type"] == 'budget status':
         if v['year'] == datetime.now().year:
             cur_mon = datetime.now().month
@@ -473,6 +479,15 @@ def create_output(df,df_fil,v,categories,output_method=0):
     if 'budget' in v['type']:
         df_sorted['tot'] = df_sorted[_month_col].sum(axis=1)
 
+    if 'budget' in v['type']:
+        numeric_columns = df_sorted.select_dtypes(include='number')
+        #columns_to_set_empty = [col for col in df_sorted.columns if col not in numeric_columns]
+        df_total = pd.DataFrame(columns=df_sorted.columns)
+        df_total = df_total.append(pd.Series(dtype='object'), ignore_index=True)
+        #for c in columns_to_set_empty:
+        #    df_total[c][0] = ''
+        df_total.loc[0] = numeric_columns.sum()
+        df_total.fillna('', inplace=True)
     if output_method != 'df' and output_method != 'table':
         pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
         total_length = len(df_sorted)
@@ -490,10 +505,9 @@ def create_output(df,df_fil,v,categories,output_method=0):
                 df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
     
     if output_method == 0 or output_method == 'df' or output_method == 'table':
-        if 'posted_date' in df_sorted:
-            df_sorted['posted_date'] = df_sorted['posted_date'].dt.strftime('%d %b %Y')
-        if 'date' in df_sorted:
-            df_sorted['date'] = df_sorted['date'].dt.strftime('%d %b %Y')
+        for date_column in ['posted_date','date','imported','changed']:
+            if date_column in df_sorted and date_column in print_col:
+                df_sorted[date_column] = df_sorted[date_column].dt.strftime('%d %b %Y')
         # Changing category column to name.
         
         if 'category' in settings['views'][v['view']]['columns']:
@@ -529,6 +543,7 @@ def create_output(df,df_fil,v,categories,output_method=0):
                         _text = f"{category_name}"
                     #_text = category_name + ' - ' + sub_category_name
                     df_sorted.at[index, 'category'] = _text.strip()
+                    # Select only numeric columns for summing
         if len(df_sorted) > 0 and (output_method == 0 or output_method == 'table'):
             float_format = lambda x: f"{x:,.2f}"
             for c in ['amount','value','balance']:
@@ -538,15 +553,20 @@ def create_output(df,df_fil,v,categories,output_method=0):
             for c in ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','tot']:
                 if c in df_sorted.columns:
                     df_sorted[c] = df_sorted[c].apply(float_format)
+                if 'budget' in v['type']:
+                    if c in df_total.columns:
+                        df_total[c] = df_total[c].apply(float_format)
         max_col = v['max_col_width']
         if output_method == 'df':
             return df_sorted
         if output_method != 'table':
             df_sorted.loc[:,'select'] = range(len(df_sorted), 0, -1)
             print_col = list(['select'] + print_col)
+            if 'budget' in v['type']:
+                df_total.loc[0,'select'] = ''
         table = pt(print_col)
         table._max_width = {col: max_col for col in print_col}
-        for col, align in zip(print_col, align_col):
+        for col, align in zip(print_col_align, align_col):
             table.align[col] = align
         for index,row in df_sorted[print_col].iterrows():
             if not v['show_multiple_lines']:
@@ -555,6 +575,9 @@ def create_output(df,df_fil,v,categories,output_method=0):
                         if len(row[column]) > max_col:
                             row[column] = row[column][:max_col-3] + '...'
             table.add_row(row)
+        if 'budget' in v['type']:
+            for index,row in df_total[print_col].iterrows():
+                table.add_row(row)
         if output_method == 0:
             print('')
             print_header = settings['views'][v['view']]['name'].format(year=v['year'])
@@ -1194,11 +1217,12 @@ def parse_duration_string(duration_input):
 def convert_delta_filter_time():
     for i in range(len(settings['filters'])):
         for column_name, column_filter in settings['filters'][i].items():
-            if 'date' in column_name or 'stamp' in column_name:
-                for bound, time_val in column_filter.items():
-                    if '-' == time_val[0]:
-                        new_val = parse_duration_string(time_val)
-                        settings['filters'][i][column_name][bound] = new_val
+            if column_name in ['posted_date','date','imported','changed']:
+                if 'date' in column_name or 'imported' in column_name:
+                    for bound, time_val in column_filter.items():
+                        if '-' == time_val[0]:
+                            new_val = parse_duration_string(time_val)
+                            settings['filters'][i][column_name][bound] = new_val
 def get_months(_i='all'):
     _all = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
     if _i == 'all':
@@ -1673,12 +1697,15 @@ def print_help(commands,view):
         
 if __name__ == '__main__':
     # Enable history navigation
+    #reorg initialize
     readline.parse_and_bind("tab: complete")
     readline.set_history_length(1000)
     settings = import_settings('general')
     view_setting = import_settings('views')
+    email_settings = import_settings('email')
     settings['filters'] = view_setting['filters']
     settings['views'] = view_setting['views']
+    settings['email'] = email_settings
     categories,auto_categories = import_settings('categories')
     marked = import_settings('marked')
     export = import_settings('export')
@@ -1719,6 +1746,7 @@ if __name__ == '__main__':
     dataframe_update = False
     warn_message = []
     pickle_file_path = ''
+    #reorg auto load
     if 'auto_load' in settings:
         pickle_file_path = settings['auto_load']
         if os.path.exists(pickle_file_path):
@@ -1735,9 +1763,13 @@ if __name__ == '__main__':
     # while loop
     while run:
         _input = input('')
+        #shlex.split(_input)
         if len(_input) > 0:
             try:
+                #Set current data_frame/filter/view
                 cur_df,df_filters,view = set_view_and_filter(_input,settings,view,df_filters)
+                #reorg handle user input
+                #     reorg Set dataframe
                 if _input in 'ur':
                     if view["type"] == 'plots':
                         if _input.lower() == 'u':
@@ -1798,13 +1830,14 @@ if __name__ == '__main__':
                         pickle_file_path = pkl_path
                         print(f'ok')
                         skip_update = True
-                # select import
+                # import dataframe
                 if _input == 'i':
                     dataframe_update = True
                     cur_df = import_data(cur_df)
                     if cur_df is None:
                         skip_update = True
                         warn_message.append('Import canceled')
+                # export data
                 elif _input == 'e':
                     for output,item in export.items():
                         export_text = []
@@ -1869,19 +1902,59 @@ if __name__ == '__main__':
                                     if 'sum' in value:
                                         return_value = export_df[value.split('.')[0]].sum()
                                 if _type == 'df':
-                                    export_text.append(table_df)
+                                    pretty_table_string = table_df.get_string().splitlines()
+                                    export_text.extend(pretty_table_string)
                                 if par_type != 'df':
                                     variables[_type] = return_value
-                        with open(output, 'w') as file:
-                            for string_item in export_text:
-                                file.write(f"{string_item}\n")
-
-                        A = 1
+                        for output_item in output.split(','):
+                            if '@' in output_item:
+                                import smtplib
+                                import ssl
+                                import html
+                                from email.mime.text import MIMEText
+                                from email.mime.multipart import MIMEMultipart
+                                # Sender's email address and password
+                                sender_email = settings['email']['email']
+                                password = settings['email']['app_password']
+                                if len(password) != 16:
+                                    print('Email app password needs to be a 16 character key')
+                                
+                                # Create the MIME object
+                                message = MIMEMultipart()
+                                message["From"] = sender_email
+                                message["To"] = output_item
+                                message["Subject"] = export_text[0]
+                                
+                                # Add body to the email
+                                # Generate the email body
+                                body = "<html><body style='font-family: \"Courier New\", monospace;'>"
+                                
+                                for element in export_text[1:]:
+                                    if isinstance(element, str):
+                                        body += f"<pre>{html.escape(str(element))}</pre>"
+                                    else:
+                                        # Handle other cases if needed
+                                        pass
+                                
+                                body += "</body></html>"
+                                message.attach(MIMEText(body, "html"))
+                                
+                                # Establish a secure connection with the SMTP server
+                                context = ssl.create_default_context()
+                                
+                                with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+                                    server.login(sender_email, password)
+                                    # Send the email
+                                    server.sendmail(sender_email, output_item, message.as_string())
+                            else:
+                                with open(output_item, 'w') as file:
+                                    for string_item in export_text:
+                                        file.write(f"{string_item}\n")
                 if _input[0] in 'pcfshdb' or _input.split(' ')[0] == 'auto' :
                     if _input[0] == 'h':
                         print_help('basic',view)
                         skip_update = True
-                    # Pages
+                    # Change page
                     if _input[0] == 'p':
                         if _input == 'pn' or _input == 'pp':
                             if _input == 'pn':
@@ -1896,7 +1969,7 @@ if __name__ == '__main__':
                                 skip_dummy = 0
                         else: 
                             view["page"] = '1'
-                    # Year
+                    # Change budget year
                     if _input[0] == 'b':
                         if _input == 'bn' or _input == 'bp':
                             if _input == 'bn':
@@ -1904,8 +1977,7 @@ if __name__ == '__main__':
                             else:
                                 add = -1
                             view["year"] = int(view["year"]) + add
-                    # Safe dataframe as own, and only update after all this
-                    # select filters
+                    # Change filter filters
                     if _input.split(' ')[0] == 'f':
                         _split = _input.split(' ')
                         filter_input = _input[len(_split[0])+1:]
@@ -1916,8 +1988,8 @@ if __name__ == '__main__':
                             print(df_filters)
                             skip_update = True
                         else:
-                            df_filter = set_filter(filter_input,df_filter)
-                    # select detail
+                            df_filters = set_filter(filter_input,df_filters)
+                    # Select detail
                     if _input.split(' ')[0] == 'd':
                         _split = _input.split(' ')
                         if len(_split) == 1:
@@ -1960,7 +2032,7 @@ if __name__ == '__main__':
                                 print('Only 1 selection allowed')
                         skip_update = True
 
-                    # select change
+                    # change dataframe
                     elif _input.split(' ')[0] == 'c' or _input.split(' ')[0] == 'cd':
                         _split = _input.split(' ')
                         if len(_split) == 1:
@@ -2001,7 +2073,7 @@ if __name__ == '__main__':
                                             cur_df = change_dataframe_rows(cur_df,view,_column,change_ids,_value)
                                     else: skip_update = True
                             else: skip_update = True
-                    # select budget
+                    # auto categorize
                     if _input.split(' ')[0] == 'auto':
                         _split = _input.split(' ')
                         if len(_split) > 1:
@@ -2011,7 +2083,7 @@ if __name__ == '__main__':
                         change_ids = create_output(cur_df,df_filters,view,None,id_sel)
                         cur_df = auto_change_dataframe(cur_df,df_filters, view,auto_categories,change_ids)
                         dataframe_update = True
-                    # Split
+                    # Split category
                     if _input.split(' ')[0] == 's' or _input.split(' ')[0] == 'sd':
                         _split = _input.split(' ')
                         if len(_split) == 1:
@@ -2026,8 +2098,11 @@ if __name__ == '__main__':
                             else:
                                 change_ids = create_output(cur_df,df_filters,view,None,_split[1])
                                 if len(change_ids) > 0:
-                                    new_value = float(_split[2])
-                                    if new_value is not None and new_value != 0:
+                                    try:
+                                        new_value = float(_split[2])
+                                    except:
+                                        new_value = _split[2]
+                                    if new_value is not None and len(str(new_value)) > 0:
                                         if len(_split) > 3 and len(_split[3]) > 0: #Create new_category
                                             new_cat = autocomplete_category(categories,_split[3])
                                             if not new_cat == None:

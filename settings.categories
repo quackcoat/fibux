@@ -90,14 +90,37 @@ c;Udlæg
 # columns to change = category,marked,date. columns to filter for = text,amount,notes. Use comma to search for multiple values.
 marked=jakob;info=XXXX 1056,XXXX1056,XXXX 9890,XXXX9890
 marked=stephanie;info=XXXX 1130,XXXX1130,XXXX 9700,XXXX9700
+#indkomst
 category=løn;date=first;text=lønoverførsel,månedsløn
 category=feriepenge;text=feriepenge
-cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,lidl,aldi,coop,føtex,normal
+category=rente;text=rente;value>0
+#dagligvare
+cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,abc-super,lidl,aldi,coop,føtex,normal,bilka,foetex
 cat=apotek;marked=;text=apotek
+#Bolig
 category=boliglån;marked=;date=first;text=totalkredit
-category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa
-category=fastfood;text=pizza,just-eat,burger
-category=elektronik;text=power,elgiganten,proshop
-category=møbler;text=biltema
-category=software;text=google play,apple.com,apps
+category=indbo;info=indboforsikring;text=tryg
+category=varme;text=verdo,vand
+#Transport
 category=brændstof;text=q8,ingo,circle,f24
+category=bilkøb;text=al finans
+category=anden transport;marked=;text=wash world
+category=bilforsikring;info=motorkøretøj;text=tryg
+#Ovrige faste
+category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa
+category=streaming;text=mobilepay claus hors;value=440
+category=telefoni;marked=;text=call me,cbb
+category=kontaktlinse;text=kontaktlinse
+category=ulykke;info=børneforsikring,ulykkesforsikring;text=tryg
+category=fagforening;text=a-kasse,dbio,ida,lønsikring
+#Privatforbrug
+category=andet;text=rdfg
+category=fastfood;text=pizza,just-eat,burger
+category=biograf;text=nfb
+category=elektronik;text=power,elgiganten,proshop
+category=møbler;text=biltema,jysk
+category=gaver;text=br herning
+category=software;text=google play,apple.com,apps
+category=Sport & fritid;text=gry dans
+category=tøj & sko;text=h&m,snt,boozt,reshopper
+#category=ulykke;info=børneforsikring,ulykkeforsikring;text=q8,ingo,circle,f24
