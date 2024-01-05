@@ -5,7 +5,7 @@ views[0] = {"key": "bal", "name":"Balance", "type": "posts",
 filters[0] = {"key": "bal", "type": "posts",
              "sort": {"column": "imported", "direction": "des"},
              "sort2": {"column": "", "direction": ""},
-             "timestamp": {"min": "-1year2month"}
+             "posted_date": {"min": "-1year2month"}
             }
 views[1] = {"key": "cat","name":"Categories", "type": "posts",
             "columns": ["id","date","text","category","amount","marked","status"],
@@ -48,3 +48,12 @@ filters[5] = {"key": "bus", "type": "budget status",
              "sort": {"column": "id", "direction": "asc"},
              "sort2": {"column": "category", "direction": ""}
              }
+views[6] = {"key": "new","name":"Categories", "type": "posts",
+            "columns": ["id","date","text","category","amount","marked","status"],
+            "align": ["c","c","l","l","r","l","c"]
+           }
+filters[6] = {"key": "new", "type": "posts",
+             "sort": {"column": "date", "direction": "des"},
+             "sort2": {"column": "id", "direction": "des"},
+             "imported": {"min": "-4day"}
+            }
