@@ -1,4 +1,4 @@
-output:stephanie_budget_data.txt,jakobandreasen1986@gmail.com
+output:stephanie_budget_data.txt,jakobandreasen1986@gmail.com,smily2003@hotmail.com
 par0:budget;key=bus;name=Stephanie;value=current_month_sum
 par1:posts;key=ste;filter=sta ok;value=amount.sum
 par2:posts;key=ste;value=amount.sum

@@ -270,7 +270,7 @@ def import_data(input_df=None,new=False):
                     break
             if match_found:
                 new_data = new_data.iloc[i+3:]
-                initial_id = df['id'].iloc[-1] + 1
+                initial_id = dfs_history[current_history_index]['id'].max() + 1
                 new_data['id'] = range(initial_id,initial_id + len(new_data))
                 if 'split_id' not in headers:
                     new_data['split_id'] = -1
@@ -344,7 +344,7 @@ def import_data(input_df=None,new=False):
     else:
         return None
 
-def create_output(df,df_fil,v,categories,output_method=0):
+def create_output(df,df_fil,v,output_method=0):
     # Select correct view
     print_col = settings['views'][v["view"]]['columns']
     print_col_align = settings['views'][v["view"]]['columns']
@@ -356,6 +356,8 @@ def create_output(df,df_fil,v,categories,output_method=0):
                 for rem_mon in rem_month_col:
                     if rem_mon in print_col:
                         print_col.remove(rem_mon)
+            if cur_mon == 1 and 'tot' in print_col:
+                print_col.remove('tot')
     align_col = settings['views'][v["view"]]['align']
     # Set filters based on type
     filters = 0
@@ -410,10 +412,10 @@ def create_output(df,df_fil,v,categories,output_method=0):
 
     if 'budget' in v['type']:
         if v['seperate_marked_in_budget']:
-            mar_list = autocomplete_marked(marked)
+            mar_list = autocomplete_marked()
             #mar_dic = {index: value for index, value in enumerate(mar_list)}
             mar_dic = {key: {} for key in mar_list}
-            for _m,_item in marked.items():
+            for _m,_item in settings['marked'].items():
                 for start,end,value in zip(_item['start'],_item['end'],_item['value']):
                     start_date = pd.to_datetime(start, format='%Y-%m')
                     end_date = pd.to_datetime(end, format='%Y-%m')
@@ -432,7 +434,7 @@ def create_output(df,df_fil,v,categories,output_method=0):
                         else:
                             new_val = mar_dic[_m][_mon] + value_sum
                             mar_dic[_m][_mon] = new_val
-            for _m,_item in marked.items():
+            for _m,_item in settings['marked'].items():
                 post_df = dfs_history[current_history_index].copy()
                 max_date = datetime.strptime(str(v['year']-1)+'-12-31', '%Y-%m-%d')
                 #min_date = datetime.strptime(str(v['year']-1)+'-12-1', '%Y-%m-%d')
@@ -478,12 +480,15 @@ def create_output(df,df_fil,v,categories,output_method=0):
             df_sorted = budget_status(df_sorted,post_dfs,v)
     if 'budget' in v['type']:
         df_sorted['tot'] = df_sorted[_month_col].sum(axis=1)
-
     if 'budget' in v['type']:
         numeric_columns = df_sorted.select_dtypes(include='number')
         #columns_to_set_empty = [col for col in df_sorted.columns if col not in numeric_columns]
         df_total = pd.DataFrame(columns=df_sorted.columns)
-        df_total = df_total.append(pd.Series(dtype='object'), ignore_index=True)
+        #df_total = df_total.append(pd.Series(dtype='object'), ignore_index=True)
+        
+        # Add a row with empty values to all columns
+        #df_total.loc[0] = [''] * len(df_total.columns)
+        
         #for c in columns_to_set_empty:
         #    df_total[c][0] = ''
         df_total.loc[0] = numeric_columns.sum()
@@ -522,21 +527,21 @@ def create_output(df,df_fil,v,categories,output_method=0):
                     if isinstance(row["category_type"],str) and len(row["category_type"].split(',')) > 1:
                         unique_types = list(set(row["category_type"].split(',')))
                         if len(unique_types) == 1:
-                            category_name = categories[int(unique_types[0])]['name']
+                            category_name = settings['categories'][int(unique_types[0])]['name']
                         else:
                             category_name = 'Multiple'
                         # if they are the same as below otherwise Multiple
                     elif category == 'Marked':
                         category_name = 'Marked'
                     else:
-                        category_name = categories[category_type]['name']
+                        category_name = settings['categories'][category_type]['name']
                     if category_name == 'Multiple' or category_name == 'Marked':
                         sub_category_name = ''
                     else:
                         if len(category.split(',')) > 1:
                             sub_category_name = 'Multiple'
                         else:
-                            sub_category_name = categories[category_type][category]
+                            sub_category_name = settings['categories'][category_type][category]
                     if len(sub_category_name):
                         _text = f"{category_name} - {sub_category_name}"
                     else:
@@ -779,13 +784,13 @@ def change_dataframe_rows(df,v , column_to_change, dataframe_ids, new_value):
 
     return df 
 
-def auto_change_dataframe(df, df_filt,cur_view, auto, input_ids):
+def auto_change_dataframe(df, df_filt,cur_view, input_ids):
     mod_df = df.copy()
-    for auto_value in auto: 
+    for auto_value in settings['auto_categories']: 
         mod_filt = df_filt.copy()
         for _c,_v in auto_value['search'].items():
             mod_filt = change_filter(mod_filt,_c,_v)
-        filter_ids = create_output(df, mod_filt, cur_view,None,'all')
+        filter_ids = create_output(df, mod_filt, cur_view,'all')
         combined_ids = pd.concat([input_ids, filter_ids],ignore_index=True)
         change_ids = combined_ids[combined_ids.duplicated()]
         for _c,_v in auto_value['change'].items():
@@ -793,7 +798,7 @@ def auto_change_dataframe(df, df_filt,cur_view, auto, input_ids):
            if _value is not None or _v == 'first':
                if _c == 'category':
                    if _v != '':
-                       _v = autocomplete_category(categories,_v)
+                       _v = autocomplete_category(_v)
                    else:
                        _v = ['','']
                    if _v is not None:
@@ -801,7 +806,7 @@ def auto_change_dataframe(df, df_filt,cur_view, auto, input_ids):
                        mod_df = change_dataframe_rows(mod_df,cur_view,'category_type',change_ids,_v[0])
                elif _c == 'marked':
                    if _v != '':
-                       _v = autocomplete_marked(marked,_v)[0]
+                       _v = autocomplete_marked(_v)[0]
                    if _v is not None:
                        mod_df = change_dataframe_rows(mod_df,cur_view,_c,change_ids,_v)
                else:
@@ -830,7 +835,7 @@ def split_dataframe_rows(df, dataframe_ids, new_value, new_category, new_mark, n
     ids_to_split = dataframe_ids.unique()
 
     # Get the maximum existing ID value
-    max_id = df['id'].max()
+    max_id = dfs_history[current_history_index]['id'].max()
 
     # Create new rows with the updated values and unique IDs
     #new_rows = df.copy()
@@ -839,12 +844,17 @@ def split_dataframe_rows(df, dataframe_ids, new_value, new_category, new_mark, n
     new_rows['split_id'] = new_rows.apply(lambda row: row['split_id'] if row['split_id'] >= 0 else row['id'], axis=1)
     new_rows['id'] = new_ids
     if new_mark is not None:
-        new_rows['marked'] = new_mark
+        if new_mark != '-':
+            new_rows['marked'] = new_mark
     else:
         new_rows['marked'] = ''
-    if new_category != '':
-        new_rows['category_type'] = new_category[0]
-        new_rows['category'] = new_category[1]
+    if new_category != '-':
+        if new_category == '':
+            new_rows['category_type'] = new_category
+            new_rows['category'] = new_category
+        else:
+            new_rows['category_type'] = new_category[0]
+            new_rows['category'] = new_category[1]
     new_rows['notes'] = new_note
     dt = pd.to_datetime(datetime.now())
     new_rows['changed'] = dt
@@ -882,19 +892,28 @@ def delete_split_dataframe_rows(df, dataframe_ids):
     # Get the IDs of the rows to be split
     ids_to_delete = dataframe_ids.unique()
 
-    for index, row in df[((df['id'].isin(ids_to_delete)) & (df['split_id'] >= 0))].iterrows():
-        df_id = row['split_id']
-        value_to_add = row['amount']
+    global dataframe_update
+    global skip_update
+    global warn_message
+    if len(df[((df['id'].isin(ids_to_delete)) & (df['split_id'] >= 0))]):
+        for index, row in df[((df['id'].isin(ids_to_delete)) & (df['split_id'] >= 0))].iterrows():
+            df_id = row['split_id']
+            value_to_add = row['amount']
+            
+            # Find rows where account_id matches and split is 'n'
+            row_to_update = df[df['id'] == df_id]
+            
+            # Update the 'value' column in the selected rows
+            df.loc[row_to_update.index, 'amount'] += value_to_add
         
-        # Find rows where account_id matches and split is 'n'
-        row_to_update = df[df['id'] == df_id]
-        
-        # Update the 'value' column in the selected rows
-        df.loc[row_to_update.index, 'amount'] += value_to_add
+        df = df[~((df['id'].isin(ids_to_delete)) & (df['split_id'] >= 0))]
+        return df
+    else:
+        skip_update = True
+        dataframe_update = False
+        warn_message.append('Did not find any split post to delete. And original post cannot be deleted')
+
     
-    df = df[~((df['id'].isin(ids_to_delete)) & (df['split_id'] >= 0))]
-    
-    return df
 
 def convert_string_to_list(string):
     """
@@ -965,7 +984,7 @@ def str_to_datetime(date_string):
             dt = datetime.strptime(date_string, '%Y-%m-%d')
     return dt
 
-def autocomplete_category(categories, string_bit, output='default'):
+def autocomplete_category( string_bit, output='default'):
     if string_bit != '':
         output2 = output
         if output == 'comp_list' or output == 'sep_list':
@@ -982,8 +1001,8 @@ def autocomplete_category(categories, string_bit, output='default'):
                 subcategory = string_bit[-1]
             if category.isdigit():
                 category = int(category)
-                if category in categories:
-                    if subcategory in categories[category]:
+                if category in settings['categories']:
+                    if subcategory in settings['categories'][category]:
                         if output2 == 'list':
                             count += 1
                             result.append(str(category) + subcategory)
@@ -991,14 +1010,14 @@ def autocomplete_category(categories, string_bit, output='default'):
                             return [category, subcategory]
                     elif subcategory == '':
                         if output2 == 'list':
-                            for sub, item in categories[category].items():
+                            for sub, item in settings['categories'][category].items():
                                 if sub != 'name' and sub != 'type':
                                     count += 1
                                     result.append(str(category) + sub)
                 elif category == 0:
-                    for cat, item in categories.items():
+                    for cat, item in settings['categories'].items():
                         _type = ''
-                        for sub, item in categories[cat].items():
+                        for sub, item in settings['categories'][cat].items():
                             if sub == 'type':
                                 _type = item
                             if sub != 'name' and sub != 'type' and _type != 'ignore':
@@ -1006,7 +1025,7 @@ def autocomplete_category(categories, string_bit, output='default'):
                                 result.append(str(cat) + sub)
         # Check for matches in category names and subcategory names
         if not string_bit.isdigit():
-            for category, subcategories in categories.items():
+            for category, subcategories in settings['categories'].items():
                 for subcategory, name in subcategories.items():
                     if string_bit.lower() in name.lower():
                         if subcategory != 'name' and subcategory != 'type':
@@ -1038,7 +1057,7 @@ def autocomplete_category(categories, string_bit, output='default'):
             return result1,result2
         else:
             print(f'{count} matches found for {string_bit}')
-        for category, subcategories in categories.items():
+        for category, subcategories in settings['categories'].items():
             for subcategory, name in subcategories.items():
                 if string_bit.lower() in name.lower():
                     A = 1
@@ -1047,24 +1066,25 @@ def autocomplete_category(categories, string_bit, output='default'):
         # Return None if no match is found
     return None
 
-def autocomplete_marked(marked, string_bit='',output='default'):
-    mark_list = []
-    if string_bit != '':
-        for mark, name in marked.items():
-            if string_bit.lower() == mark[:min(len(string_bit),len(mark))].lower():
-                mark_list.append(mark)
-        if len(mark_list) == 0:
-            print('No marked options found for ' + string_bit)
-        elif output == 'comp_list' or len(mark_list) == 1:
-            return mark_list
+def autocomplete_marked(string_bit='',output='default'):
+    if 'marked' in settings:
+        mark_list = []
+        if string_bit != '':
+            for mark, name in settings['marked'].items():
+                if string_bit.lower() == mark[:min(len(string_bit),len(mark))].lower():
+                    mark_list.append(mark)
+            if len(mark_list) == 0:
+                print('No marked options found for ' + string_bit)
+            elif output == 'comp_list' or len(mark_list) == 1:
+                return mark_list
+            else:
+                print(f'{len(mark_list)} matches found for {string_bit}')
         else:
-            print(f'{len(mark_list)} matches found for {string_bit}')
-    else:
-        for mark, name in marked.items():
-            if mark not in mark_list:
-                mark_list.append(mark)
-        return mark_list
-    # Return None if no match is found
+            for mark, name in settings['marked'].items():
+                if mark not in mark_list:
+                    mark_list.append(mark)
+            return mark_list
+        # Return None if no match is found
     return None
 
 def read_data(filename):
@@ -1137,11 +1157,11 @@ def change_filter(input_filters, input_column,input_value):
                 cat_values = []
                 for ci in cat_ids:
                     if ci.isdigit():
-                        for key in categories[int(ci)]:
+                        for key in settings['categories'][int(ci)]:
                             if key != 'name':
                                 cat_values.append(ci+key)
                     else:
-                        cat_value_list = autocomplete_category(categories,ci,output='comp_list')
+                        cat_value_list = autocomplete_category(ci,output='comp_list')
                         if cat_value_list is not None:
                             for cvl in cat_value_list:
                                 cat_values.append(cvl)
@@ -1152,7 +1172,7 @@ def change_filter(input_filters, input_column,input_value):
                 mar_values = []
                 mar_ids = _value.split(',')
                 for mi in mar_ids:
-                    mar_value_list = autocomplete_marked(marked,mi,output='comp_list')
+                    mar_value_list = autocomplete_marked(mi,output='comp_list')
                     if mar_value_list != None:
                         for ma in mar_value_list:
                             if ma not in mar_values:
@@ -1214,7 +1234,7 @@ def parse_duration_string(duration_input):
 
     return result_datetime
 
-def convert_delta_filter_time():
+def convert_delta_filter_time(settings):
     for i in range(len(settings['filters'])):
         for column_name, column_filter in settings['filters'][i].items():
             if column_name in ['posted_date','date','imported','changed']:
@@ -1223,6 +1243,8 @@ def convert_delta_filter_time():
                         if '-' == time_val[0]:
                             new_val = parse_duration_string(time_val)
                             settings['filters'][i][column_name][bound] = new_val
+    return settings
+
 def get_months(_i='all'):
     _all = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
     if _i == 'all':
@@ -1272,7 +1294,7 @@ def read_budget_files(folder_path='./'):
                 if len(row) and row[0][0] not in '#':
                     for cat in row[1].split(';'):
                         if cat[0] != '-':
-                            cat_value_list = autocomplete_category(categories,cat,output='comp_list')
+                            cat_value_list = autocomplete_category(cat,output='comp_list')
                             if not cat_value_list == None:
                                 for cat2 in cat_value_list:
                                     _t = int(cat2[:len(cat2)-1])
@@ -1360,7 +1382,7 @@ def read_budget_files(folder_path='./'):
             for values in dfs:
                 # Check if the 'category' key exists and its first character is '-'
                 if 'category' in values and len(values['categories']) and values['categories'][0] == '-':
-                    cat_type_list,cat_sub_list = autocomplete_category(categories,values['categories'][1:],output='sep_list')
+                    cat_type_list,cat_sub_list = autocomplete_category(values['categories'][1:],output='sep_list')
                     if values['categories'][1:] == '0':
                         zero_id = values['id']
                     else:
@@ -1385,7 +1407,7 @@ def read_budget_files(folder_path='./'):
             if zero_id >= 0:
                 for values in dfs:
                     if values['id'] == zero_id:
-                        cat_type_list,cat_sub_list = autocomplete_category(categories,'0',output='sep_list')
+                        cat_type_list,cat_sub_list = autocomplete_category('0',output='sep_list')
                         for cat_type,cat_sub in zip(cat_type_list,cat_sub_list):
                             found = False
                             for other_cat_type,other_cat_sub in zip(other_cat_type_list,other_cat_sub_list):
@@ -1488,14 +1510,18 @@ def budget_status(df,post_df,v,output_method=0):
     return df 
 
 def set_view_and_filter(_input_key,_settings,_view,_df_filter={}):
+    global warn_message
+    global skip_update
     for fil,i in zip(_settings['filters'],range(len(_settings['filters']))):
         if 'key' in fil:
+            skip_update = False
             if _input_key == fil['key']:
                 _df_filter = fil.copy()
                 break
     for vie,i in zip(_settings['views'],range(len(_settings['views']))):
         if 'key' in vie:
             if _input_key == vie['key']:
+                skip_update = False
                 _view["type"] = vie['type']
                 _view["view"] = i
                 _view["page"] = '1'
@@ -1510,6 +1536,7 @@ def set_view_and_filter(_input_key,_settings,_view,_df_filter={}):
         if _view["year"] == 0:
             _view["year"] = datetime.now().year
         if _view["year"] in budgets:
+            skip_update = False
             _cur_df = budgets[_view["year"]].copy()
             if _view["group"] == 'category':
                 _cur_df = group_and_sum_rows(_cur_df,1)
@@ -1527,27 +1554,26 @@ def set_view_and_filter(_input_key,_settings,_view,_df_filter={}):
     return _cur_df,_df_filter,_view
 
 def set_filter(filter_input,existing_filter={}):
-    _split = filter_input.split(' ')
-    if len(_split) == 1: 
-        if _split[0][:min(3,len(_split[0]))] == 'res':
+    if len(filter_input) == 1: 
+        if filter_input[0][:min(3,len(filter_input[0]))] == 'res':
             existing_filter = settings['filters'][view['filter']].copy()
-    if len(_split) == 2: 
-        if _split[0] == 'del':
-            _column = find_column(_split[1])
+    if len(filter_input) == 2: 
+        if filter_input[0] == 'del':
+            _column = find_column(filter_input[1])
             if _column in existing_filter:
                 del existing_filter[_column]
-        elif _split[0] in ['sor','sor2','sort','sort2']:
-            if _split[0][-1] != '2':
+        elif filter_input[0] in ['sor','sor2','sort','sort2']:
+            if filter_input[0][-1] != '2':
                 sort_name = 'sort'
             else:
                 sort_name = 'sort2'
-            if _split[1] == 'asc' or _split[1] == 'des':
-                if _split[0][-1] != '2':
-                    existing_filter[sort_name]['direction'] = _split[1]
+            if filter_input[1] == 'asc' or filter_input[1] == 'des':
+                if filter_input[0][-1] != '2':
+                    existing_filter[sort_name]['direction'] = filter_input[1]
                 else:
-                    existing_filter[sort_name]['direction'] = _split[1]
+                    existing_filter[sort_name]['direction'] = filter_input[1]
             else:
-                _column = find_column(_split[1])
+                _column = find_column(filter_input[1])
                 if _column is not None:
                    if existing_filter[sort_name]['column'] != _column:
                        existing_filter[sort_name]['column'] = _column
@@ -1557,8 +1583,8 @@ def set_filter(filter_input,existing_filter={}):
                        else:
                            existing_filter[sort_name]['direction'] = 'des'
         else:
-            _column = find_column(_split[0])
-            existing_filter = change_filter(existing_filter,_column,_split[1])
+            _column = find_column(filter_input[0])
+            existing_filter = change_filter(existing_filter,_column,filter_input[1])
     return existing_filter
 
 def evaluate_textstring(template, variable_dict):
@@ -1590,7 +1616,522 @@ def evaluate_textstring(template, variable_dict):
     formatted_string = pattern.sub(eval_expression, template)
     return formatted_string
 
+def undo_redo_dataframe(user_input):
+    global current_history_index
+    global warn_message
+    if view["type"] == 'posts':
+        if user_input[0].lower() == 'u':
+            current_history_index += 1
+        elif user_input[0].lower() == 'r':
+             current_history_index -= 1
+        if current_history_index < 0:
+            warn_message.append('Redo not possible. Current stage is the latest')
+            current_history_index = 0
+        elif current_history_index >= len(dfs_history):
+            warn_message.append('Undo not possible. No more history saved')
+            current_history_index = len(dfs_history) - 1
+        cur_df = dfs_history[current_history_index].copy()
+        return cur_df
+
+def clear_dataframe():
+    print('Are you sure to clear all data?')
+    clear_input = input('y/n: ')
+    if clear_input == 'y':
+        dfs_history = []
+        cur_df = None
+        current_history_index = 0
+        skip_update = True
+    print('Ok')
+
+def save_load_dataframe(_type,pkl_path):
+    global skip_update
+    global warn_message
+    if _type == 'w':
+        if os.path.exists(pkl_path):
+            print(f'Do you want to overwrite {pkl_path}?')
+            overwrite_input = input('y/n: ')
+        else:
+            overwrite_input = 'y'
+        if not overwrite_input == 'y':
+            pkl_path = filedialog.asksaveasfilename(defaultextension=".pkl",filetypes=[("Pickle files", "*.pkl"), ("All files", "*.*")],title="Save As")
+    if _type == 'l':
+        if len(pkl_path) == 0 or not os.path.exists(pkl_path):
+            pkl_path = filedialog.askopenfilename(filetypes=[("Pickle Files", "*.pkl")])
+            if len(pkl_path) == 0 or not os.path.exists(pkl_path):
+                skip_update = True
+                warn_message.append('Cancelling load')
+        if len(pkl_path) > 0:
+            if os.path.exists(pkl_path):
+                if len(dfs_history) > 0:
+                    print(f'Do you want to load {os.path.abspath(pkl_path)}?')
+                    load_input = input('Unsaved data will be deleted. y/n/c: ')
+                else:
+                    load_input = 'y'
+                if load_input == 'y':
+                    cur_df = pd.read_pickle(pkl_path)
+                    print(f'Loading dataframe from {os.path.abspath(pkl_path)}')
+                    pickle_file_path = pkl_path
+                    return cur_df
+                elif load_input == 'n':
+                    pkl_path = filedialog.askopenfilename(filetypes=[("Pickle Files", "*.pkl")])
+                    if len(pkl_path) == 0 or not os.path.exists(pkl_path):
+                        skip_update = True
+                        warn_message.append('Cancelling load')
+                    else:
+                        cur_df = pd.read_pickle(pkl_path)
+                        print(f'Loading dataframe from {os.path.abspath(pkl_path)}')
+                        pickle_file_path = pkl_path
+                        return cur_df
+                else:
+                    skip_update = True
+                    warn_message.append('Cancelling load')
+            else:
+                skip_update = True
+                warn_message.append('Cancelling load')
+    elif _type == 'w':
+        dfs_history[current_history_index].to_pickle(pkl_path)
+        print(f'Writing dataframe to {os.path.abspath(pkl_path)}')
+        pickle_file_path = pkl_path
+        print(f'ok')
+        skip_update = True
+
+def export_dataframe():
+    if 'export' in settings:
+        for output,item in settings['export'].items():
+            export_text = []
+            variables = {}
+            for _item in item:
+                _type = _item.split(':')[0]
+                _input = _item[len(_type)+1:]
+                if _type == 'text':
+                    _string = evaluate_textstring(_input, variables)
+                    export_text.append(_string)
+                    print(_string)
+                else: 
+                    _input_split = _input.split(';')
+                    par_type = _input_split[0]
+                    export_view = view
+                    export_view['type'] = par_type
+                    export_view['year'] = datetime.now().year
+                    name = ''
+                    _id = ''
+                    value = ''
+                    return_value = -99999999999
+                    export_filter = {}
+                    for _par in _input_split[1:]:
+                        par_input_type = _par.split('=')[0]
+                        par_input_input = _par.split('=')[1]
+                        if par_input_type == 'key':
+                            export_df,export_filter,export_view = set_view_and_filter(par_input_input,settings,export_view)
+                        elif par_input_type == 'name':
+                            name = par_input_input
+                        elif par_input_type == 'id':
+                            _id = par_input_input
+                        elif par_input_type == 'value':
+                            value = par_input_input
+                        elif par_input_type == 'year':
+                            export_view["year"] = int(par_input_input)
+                        elif par_input_type == 'filter':
+                            par_split = shlex.split(par_input_input)
+                            export_filter = set_filter(par_split,export_filter)
+                    if _type != 'df':
+                        export_df = create_output(export_df,export_filter,export_view,'df')
+                    else:
+                        table_df = create_output(export_df,export_filter,export_view,'table')
+                    if par_type == 'budget':
+                        if 'current_month' == value:
+                            _column = get_months(datetime.now().month)
+                            if len(name) > 0:
+                                return_value = export_df.loc[export_df['name'] == name, _column].values[0]
+                            if len(_id) > 0:
+                                return_value = export_df.loc[export_df['id'] == _id, _column].values[0]
+                        elif 'current_month_sum' == value:
+                            _column_sum = get_months(range(1,datetime.now().month+1))
+                            if len(name) > 0:
+                                return_value = export_df.loc[export_df['name'] == name, _column_sum].sum(axis=1).values[0]
+                            if len(_id) > 0:
+                                return_value = export_df.loc[export_df['id'] == _id, _column_sum].sum(axis=1).values[0]
+                        else:
+                            _column_sum = value
+                            if len(name) > 0:
+                                return_value = export_df.loc[export_df['name'] == name, _column_sum].sum(axis=1).values[0]
+                            if len(_id) > 0:
+                                return_value = export_df.loc[export_df['id'] == _id, _column_sum].sum(axis=1).values[0]
+                    elif par_type == 'posts':
+                        if 'sum' in value:
+                            return_value = export_df[value.split('.')[0]].sum()
+                    if _type == 'df':
+                        pretty_table_string = table_df.get_string().splitlines()
+                        export_text.extend(pretty_table_string)
+                    if par_type != 'df':
+                        variables[_type] = return_value
+            for output_item in output.split(','):
+                if '@' in output_item:
+                    import smtplib
+                    import ssl
+                    import html
+                    from email.mime.text import MIMEText
+                    from email.mime.multipart import MIMEMultipart
+                    # Sender's email address and password
+                    sender_email = settings['email']['email']
+                    password = settings['email']['app_password']
+                    if len(password) != 16:
+                        print('Email app password needs to be a 16 character key')
+                    
+                    # Create the MIME object
+                    message = MIMEMultipart()
+                    message["From"] = sender_email
+                    message["To"] = output_item
+                    message["Subject"] = export_text[0]
+                    
+                    # Add body to the email
+                    # Generate the email body
+                    body = "<html><body style='font-family: \"Courier New\", monospace;'>"
+                    
+                    for element in export_text[1:]:
+                        if isinstance(element, str):
+                            body += f"<pre>{html.escape(str(element))}</pre>"
+                        else:
+                            # Handle other cases if needed
+                            pass
+                    
+                    body += "</body></html>"
+                    message.attach(MIMEText(body, "html"))
+                    
+                    # Establish a secure connection with the SMTP server
+                    context = ssl.create_default_context()
+                    
+                    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+                        server.login(sender_email, password)
+                        # Send the email
+                        server.sendmail(sender_email, output_item, message.as_string())
+                else:
+                    with open(output_item, 'w') as file:
+                        for string_item in export_text:
+                            file.write(f"{string_item}\n")
+
+def show_detail(_input):
+    global skip_update
+    if view['type'] == 'posts':
+        change_ids = create_output(cur_df,df_filters,view,_input[0])
+        print(len(change_ids))
+        if len(change_ids) == 1:
+            print()
+            print('***Imported/fixed data columns')
+            print(f'id: ' + str(cur_df.loc[change_ids,'id'].values[0]))
+            print(f'posted_date: ' + str(cur_df.loc[change_ids,'posted_date'].dt.strftime('%d %b %Y').values[0]))
+            print(f'text: ' + cur_df.loc[change_ids,'text'].values[0])
+            print(f'value: ' + str(cur_df.loc[change_ids,'value'].values[0]))
+            print(f'balance: ' + str(cur_df.loc[change_ids,'balance'].values[0]))
+            print(f'account: ' + cur_df.loc[change_ids,'account'].values[0])
+            print(f'info: ' + cur_df.loc[change_ids,'info'].values[0])
+            print(f'imported: ' + str(cur_df.loc[change_ids,'imported'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
+            print('***Category/changable data')
+            print(f'date: ' + str(cur_df.loc[change_ids,'date'].dt.strftime('%d %b %Y').values[0]))
+            cat_typ = cur_df.loc[change_ids,'category_type'].values[0]
+            cat = cur_df.loc[change_ids,'category'].values[0]
+            print(f'category_type: ' + str(cat_typ))
+            print(f'category: ' + cat)
+            if cat_typ != '':
+                category_name = settings['categories'][cat_typ]['name']
+                sub_category_name = settings['categories'][cat_typ][cat]
+                print(f'Category display name: {category_name} - {sub_category_name}')
+            print(f'amount: ' + str(cur_df.loc[change_ids,'amount'].values[0]))
+            print(f'split_id: ' + str(cur_df.loc[change_ids,'split_id'].values[0]))
+            print(f'marked: ' + cur_df.loc[change_ids,'marked'].values[0])
+            print(f'notes: ' + cur_df.loc[change_ids,'notes'].values[0])
+            print(f'status: ' + cur_df.loc[change_ids,'status'].values[0])
+            print(f'changed: ' + str(cur_df.loc[change_ids,'changed'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
+    elif view['type'] == 'budget status':
+        change_ids = create_output(cur_df,df_filters,view,_input)
+        #skip_update = True
+    else:
+        print('Only 1 selection allowed')
+    skip_update = True
+
+def change_dataframe_handle(_input,df,df_filt,vi):
+    global dataframe_update
+    global skip_update
+    _column = find_column(_input[1],False)
+    if _column is not None:
+        change_ids = create_output(df,df_filt,vi,_input[0])
+        if len(change_ids) > 0:
+            _value = _input[2]
+            if _value != '':
+                _value = convert_value_to_data_type(df,vi,_column,_input[2])
+            if _value is not None:
+                if _column == 'category':
+                    if _value != '':
+                        _value = autocomplete_category(_value)
+                    else:
+                        _value = ['','']
+                    if _value is not None:
+                        dataframe_update = True
+                        df = change_dataframe_rows(df,vi,_column,change_ids,_value[1])
+                        df = change_dataframe_rows(df,vi,'category_type',change_ids,_value[0])
+                    else: skip_update = True
+                elif _column == 'marked':
+                    if _value != '':
+                        _value = autocomplete_marked(_value)[0]
+                    if _value is not None:
+                        dataframe_update = True
+                        df = change_dataframe_rows(df,vi,_column,change_ids,_value)
+                    else: skip_update = True
+                else:
+                    dataframe_update = True
+                    df = change_dataframe_rows(df,vi,_column,change_ids,_value)
+            else: skip_update = True
+    else: skip_update = True
+    return df
+
+def split_dataframe_handle(_input,df,df_filt,vi):
+    global dataframe_update
+    global skip_update
+    if _input[0] == 'del':
+        change_ids = create_output(df,df_filt,vi,_input[1])
+        if len(change_ids) > 0:
+            df = delete_split_dataframe_rows(df, change_ids)
+            dataframe_update = True
+        else: skip_update = True
+    else:
+        change_ids = create_output(df,df_filt,vi,_input[0])
+        if len(change_ids) > 0:
+            try:
+                new_value = float(_input[1])
+            except:
+                new_value = _input[1]
+            if new_value is not None and len(str(new_value)) > 0:
+                if len(_input) > 2 and len(_input[2]) > 0: #Create new_category
+                    if _input[2] != '-':
+                        new_cat = autocomplete_category(_input[2])
+                        if not new_cat == None:
+                            no_cat = False
+                        else:
+                            no_cat = True
+                        while no_cat:
+                            print('No category found')
+                            _cat_q = input('Search again? y/n, or c for cancel: ')
+                            #_cat_q = input()
+                            if _cat_q[0].lower() == 'y':
+                                _cat_input = input('search string: ')
+                                new_cat = autocomplete_category(_cat_input)
+                                if not new_cat == None:
+                                    no_cat = False
+                            elif _cat_q[0].lower() == 'c':
+                                new_cat = None
+                                no_cat = False
+                                print('Skipping command')
+                            elif _cat_q[0].lower() == 'n':
+                                new_cat = '-'
+                                no_cat = False
+                    else:
+                        new_cat = '-' #Split to same category
+                else:
+                    new_cat = '' #
+                if len(_input) > 3 and len(_input[3]) > 0: #Create new_mark 
+                    if _input[3] == '-':
+                        new_mark = '-'
+                    else:
+                        new_mark = autocomplete_marked(_input[3])
+                else:
+                    new_mark = ''
+                if len(_input) > 4: #Create note 
+                    if _input[4][0] == 'y':
+                        print('Enter new note')
+                        new_note = input('')
+                else:
+                    new_note = ''
+                dataframe_update = True
+                df = split_dataframe_rows(df, change_ids, new_value, new_cat, new_mark, new_note)
+            else: skip_update = True
+        else: skip_update = True
+    return df
+
+def handle_user_input(user_input,df,df_filt,vi):
+    global dataframe_update
+    global warn_message
+    global current_history_index
+    # Undo and redo dataframe changes
+    if user_input[0] in ['u','r']:
+        df = undo_redo_dataframe(user_input)
+    # Clear dataframe
+    elif user_input[0] == 'clear':
+        clear_dataframe()
+    # Save and load
+    elif user_input[0] in ['w','l']:
+        df = save_load_dataframe(user_input[0],pickle_file_path)
+        if cur_df is not None:
+            dataframe_update = True
+    # import dataframe
+    elif user_input[0] == 'i':
+        dataframe_update = True
+        df = import_data(df)
+        if df is None:
+            skip_update = True
+            warn_message.append('Import canceled')
+    # export data
+    elif user_input[0] == 'e':
+        export_dataframe()
+    # Print help text
+    elif user_input[0] == 'h':
+        print_help('basic',view)
+        skip_update = True
+    # Change page
+    elif user_input[0] in ['pn','pp','p']:
+        if len(user_input) == 1 and user_input[0] == 'p':
+            print_help('page',view)
+        else:
+            if len(user_input) > 1:
+                add = int(user_input[1])
+            elif user_input[0] == 'pn':
+                add = 1
+            elif user_input[0] == 'pp':
+                add = -1
+            if user_input[0] == 'p':
+                vi["page"] = str(add)
+            else:
+                vi["page"] = str(int(vi["page"]) + add)
+    # Change budget year
+    elif user_input[0] in ['bn','bp']:
+        if _input == 'bn' or _input == 'bp':
+            if _input == 'bn':
+                add = 1
+            else:
+                add = -1
+            view["year"] = int(view["year"]) + add
+    # Change filter
+    elif user_input[0] == 'f':
+        if len(user_input) == 1:
+            print_help('filter',view)
+        else:
+            df_filters = set_filter(user_input[1:],df_filt)
+    # Show detail
+    elif user_input[0] == 'd':
+       if len(user_input) == 1:
+           print_help('detail',view)
+       else:
+           show_detail(user_input[1:])
+    # Change dataframe
+    elif user_input[0] == 'c':
+        if len(user_input) == 1:
+            print_help('change',view)
+        elif len(user_input) >= 4:
+            df = change_dataframe_handle(user_input[1:],df,df_filt,vi)
+    # Auto change dataframe
+    elif user_input[0] == 'auto':
+        if len(user_input) > 1:
+            id_sel = user_input[1]
+        else:
+            id_sel = 'all'
+        change_ids = create_output(df,df_filt,vi,id_sel)
+        df = auto_change_dataframe(df,df_filt, vi,change_ids)
+        dataframe_update = True
+    # Split dataframe
+    elif user_input[0] == 's':
+        if len(user_input) == 1:
+            print_help('split',view)
+        elif len(user_input) >= 3: 
+            df = split_dataframe_handle(user_input[1:],df,df_filt,vi)
+    return df,df_filt,vi
+
+def check_and_correct_df(df):
+    global dataframe_update
+    # Check if 'split_id' column exists in the DataFrame
+    if 'split_id' not in df.columns:
+        print("Error: 'split_id' column not found in the DataFrame.")
+        return df
+    int_columns = ['id','split_id']
+    for col in int_columns:
+        # Check the data type of int column
+        if df[col].dtype == 'object' or df[col].dtype == 'float64':
+            # Convert 'split_id' column to integer
+            try:
+                df[col] = pd.to_numeric(df[col], errors='coerce').astype('int64')
+                print(f"'{col}' column converted to integers.")
+                dataframe_update = True
+            except ValueError as e:
+                print(f"Error converting '{col}' column to integers: {e}")
+        elif df[col].dtype == 'int64':
+            Skip = True
+        else:
+            print(f"'{col}' column has an unexpected data type:", df[col].dtype)
+
+    # Check for rows where 'value' is 0 and 'split_id' is not -1
+    zero_value_minus_one_rows = df[(df['value'] == 0) & (df['split_id'] == -1)]
+    
+    # Check and fix rows with the same values in specific columns for the entire DataFrame
+    for _, group in df[df.duplicated(subset=['posted_date', 'balance', 'text', 'info'], keep=False)].groupby(['posted_date', 'balance', 'text', 'info']):
+        if any(group['id'].isin(zero_value_minus_one_rows['id'])):
+            max_id_row = group[group['id'] == group['id'].max()]
+            min_id_row = group[group['id'] == group['id'].min()]
+    
+            if max_id_row['value'].iloc[0] == 0 and min_id_row['value'].iloc[0] != 0:
+                print(f"Changing values for row with id {max_id_row['id'].iloc[0]} and row with id {min_id_row['id'].iloc[0]}")
+                max_abs_value_id = group.loc[group['value'].abs().idxmax(), 'id']
+                group.loc[group['id'] == group['id'].min(), 'value'] = group.loc[max_abs_value_id, 'value']
+    
+                # Set 'split_id' for the row with higher id to the id of the row with lower id
+                group.loc[group['id'] != group['id'].min(), 'split_id'] = int(min_id_row['id'].iloc[0])
+                df.update(group)
+                dataframe_update = True
+
+
+    # Check for NaN values in the entire DataFrame
+    nan_values = df.isnull().sum().sum()
+    if nan_values > 0:
+        print(f"Warning: The DataFrame contains {nan_values} NaN values.")
+        nan_rows = df[df.isnull().any(axis=1)]
+        print("Rows with NaN values:")
+        print(nan_rows[['id'] + list(df.columns[df.isnull().any()])])
+
+    '''
+    # Check for rows where 'value' is 0 and 'split_id' is not -1
+    zero_value_non_minus_one_rows = df[(df['value'] == 0) & (df['split_id'] != -1)]
+    
+    # Check and fix rows with the same values in specific columns for the identified rows
+    for _, group in zero_value_non_minus_one_rows.groupby(['posted_date', 'balance', 'text', 'info']):
+        if group['value'].nunique() == 1 and group['value'].iloc[0] == 0:
+            max_id_row = group[group['id'] == group['id'].max()]
+            min_id_row = group[group['id'] == group['id'].min()]
+    
+            if max_id_row['value'].iloc[0] == 0 and min_id_row['value'].iloc[0] != 0:
+                print(f"Changing values for row with id {max_id_row['id'].iloc[0]} and row with id {min_id_row['id'].iloc[0]}")
+    
+                # Swap 'value' for rows with the same values
+                df.loc[df['id'] == max_id_row['id'].iloc[0], 'value'] = min_id_row['value'].iloc[0]
+                df.loc[df['id'] == min_id_row['id'].iloc[0], 'value'] = max_id_row['value'].iloc[0]
+    
+                # Set 'split_id' for the row with higher id to the id of the row with lower id
+                df.loc[df['id'] == max_id_row['id'].iloc[0], 'split_id'] = min_id_row['id'].iloc[0]
+
+
+    duplicate_rows = df[df.duplicated(subset=['posted_date', 'balance', 'text', 'info'], keep=False)]
+    for _, group in duplicate_rows.groupby(['posted_date', 'balance', 'text', 'info']):
+        if group['value'].nunique() == 1 and group['value'].iloc[0] != 0:
+            max_id_row = group[group['id'] == group['id'].max()]
+            min_id_row = group[group['id'] == group['id'].min()]
+    
+            if min_id_row['value'].iloc[0] == 0 or min_id_row['split_id'].iloc[0] != -1:
+                print(f"Changing values for row with id {max_id_row['id'].iloc[0]} and row with id {min_id_row['id'].iloc[0]}")
+                # Swap 'value' for rows with the same values
+                df.loc[df['id'] == max_id_row['id'].iloc[0], 'value'] = min_id_row['value'].iloc[0]
+                df.loc[df['id'] == min_id_row['id'].iloc[0], 'value'] = max_id_row['value'].iloc[0]
+    
+                # Set 'split_id' for the row with higher id to the id of the row with lower id
+                df.loc[df['id'] == min_id_row['id'].iloc[0], 'split_id'] = -1
+                df.loc[df['id'] == max_id_row['id'].iloc[0], 'split_id'] = min_id_row['id'].iloc[0]
+
+    # Check for rows where ['value'] == 0 and ['split'] == -1
+    zero_value_split_minus_one_rows = df[(df['value'] == 0) & (df['split_id'] == -1)]
+    if not zero_value_split_minus_one_rows.empty:
+        print("Warning: Rows where ['value'] == -1 and ['split_id'] == -1:")
+        print(zero_value_split_minus_one_rows[['id', 'text']])
+    '''
+    return df
+
 def print_help(commands,view):
+    global skip_update
+    skip_update = True
     if commands == 'basic':
         print('Switch views:')
         print('i=import posts - q=quit')
@@ -1604,9 +2145,10 @@ def print_help(commands,view):
         print('enter f,c or s for detailts on each function')
         print()
         print('Page options:')
-        print('pn   Go to next page')
-        print('pp   Go to previous page')
-        print('p##  Go to page number')
+        print('pn     Go to next page')
+        print('pp     Go to previous page')
+        print('p ##   Go to page number')
+        print('pn ##  Go ## pages forward')
     elif commands == 'start':
         print('Switch views:')
         print('i=import posts - q=quit')
@@ -1657,12 +2199,14 @@ def print_help(commands,view):
         print('Where dir can be:')
         print('    asc for ascending direction')
         print('    des for descending direction')
+        print()
+        print('Current:')
+        print(df_filters)
     elif commands == 'change':
         print('Change column options:')
         print('c ## column val')
         print()
-        print(' To delete a column value, use cd:')
-        print('cd ## column')
+        print(' To delete a column value, set value to ""')
         print()
         print('Where column can be:')
         print('    The full name of the column to change')
@@ -1673,6 +2217,16 @@ def print_help(commands,view):
         print('    Multiple select numbers eg. 1,6,7')
         print('    Range of select numbers eg. 5-9')
         print('    all for all rows in all pages in current filter')
+    elif commands == 'page':
+        print('Change page options:')
+        print('p ##')
+        print()
+        print('Where ## is page number:')
+        print()
+        print(' To go to next or previous page:')
+        print('    Next: pn')
+        print('    Previous: pp')
+        print()
     elif commands == 'split':
         print('Split category options:')
         print('s ## new_value new_category new_mark new_note')
@@ -1694,25 +2248,24 @@ def print_help(commands,view):
         print()
         print('Where new_note is marked by y, to indicate a new note. Given during the split.')
         print()
-        
-if __name__ == '__main__':
-    # Enable history navigation
-    #reorg initialize
-    readline.parse_and_bind("tab: complete")
-    readline.set_history_length(1000)
+        print('Delete a splited id by')
+        print('s del ##')
+        print()
+
+def initialize_settings():
     settings = import_settings('general')
     view_setting = import_settings('views')
     email_settings = import_settings('email')
     settings['filters'] = view_setting['filters']
     settings['views'] = view_setting['views']
     settings['email'] = email_settings
-    categories,auto_categories = import_settings('categories')
-    marked = import_settings('marked')
-    export = import_settings('export')
-    budgets = read_budget_files()
+    settings['marked'] = import_settings('marked')
+    settings['export'] = import_settings('export')
+    settings['categories'],settings['auto_categories'] = import_settings('categories')
+    settings = convert_delta_filter_time(settings)
+    return settings
 
-    convert_delta_filter_time()
-    
+def initialize_view_and_budget():
     view = {}
     view["view"] = 0
     #default budget_view
@@ -1726,6 +2279,7 @@ if __name__ == '__main__':
     view["show_multiple_lines"] = convert_to_bool(settings.get("show_multiple_lines",True))
     view["page"] = '1'
     cur_year = datetime.now().year
+    budgets = read_budget_files()
     view["year"] = 0
     if cur_year in budgets:
         view["year"] = cur_year
@@ -1733,7 +2287,16 @@ if __name__ == '__main__':
         highest_year = max(budgets, key=budgets.get)
         if highest_year > 2000: 
             view["year"] = highest_year
-    
+    return view,budgets
+
+
+if __name__ == '__main__':
+    # Enable history navigation
+    #reorg initialize
+    readline.parse_and_bind("tab: complete")
+    readline.set_history_length(1000)
+    settings = initialize_settings()
+    view,budgets = initialize_view_and_budget()
     df_filters = settings['filters'][view["filter"]].copy()
     dfs_history = []
     current_history_index = 0
@@ -1752,7 +2315,7 @@ if __name__ == '__main__':
         if os.path.exists(pickle_file_path):
             print(f'Loading dataframe from {os.path.abspath(pickle_file_path)}')
             cur_df = pd.read_pickle(pickle_file_path)
-            view = create_output(cur_df,df_filters,view,categories)
+            view = create_output(cur_df,df_filters,view)
             print(f'Loaded dataframe from {os.path.abspath(pickle_file_path)}')
             dfs_history.append(cur_df.copy())
             print_help('basic',view)
@@ -1763,392 +2326,19 @@ if __name__ == '__main__':
     # while loop
     while run:
         _input = input('')
-        #shlex.split(_input)
         if len(_input) > 0:
             try:
-                #Set current data_frame/filter/view
+                # Set current data_frame/filter/view
                 cur_df,df_filters,view = set_view_and_filter(_input,settings,view,df_filters)
-                #reorg handle user input
-                #     reorg Set dataframe
-                if _input in 'ur':
-                    if view["type"] == 'plots':
-                        if _input.lower() == 'u':
-                            current_history_index += 1
-                        elif _input.lower() == 'r':
-                             current_history_index -= 1
-                        if current_history_index < 0:
-                            warn_message.append('Redo not possible. Current stage is the latest')
-                            current_history_index = 0
-                        elif current_history_index >= len(dfs_history):
-                            warn_message.append('Undo not possible. No more history saved')
-                            current_history_index = len(dfs_history) - 1
-                if _input == 'clear':
-                    print('Are you sure to clear all data?')
-                    clear_input = input('y/n: ')
-                    if clear_input == 'y':
-                        dfs_history = []
-                        cur_df = None
-                        current_history_index = 0
-                        skip_update = True
-                    print('Ok')
-                if _input in 'wl':
-                    pkl_path = pickle_file_path
-                    if _input == 'w':
-                        if os.path.exists(pkl_path):
-                            print(f'Do you want to overwrite {pkl_path}?')
-                            overwrite_input = input('y/n: ')
-                        else:
-                            overwrite_input = 'y'
-                        if not overwrite_input == 'y':
-                            pkl_path = filedialog.asksaveasfilename(defaultextension=".pkl",filetypes=[("Pickle files", "*.pkl"), ("All files", "*.*")],title="Save As")
-                    if _input == 'l':
-                        if len(pkl_path) == 0 or not os.path.exists(pkl_path):
-                            pkl_path = filedialog.askopenfilename(filetypes=[("Pickle Files", "*.pkl")])
-                            if len(pkl_path) == 0 or not os.path.exists(pkl_path):
-                                skip_update = True
-                                warn_message.append('Cancelling load')
-                        if len(pkl_path) > 0:
-                            if os.path.exists(pkl_path):
-                                if len(dfs_history) > 0:
-                                    print(f'Do you want to load {os.path.abspath(pkl_path)}?')
-                                    load_input = input('Unsaved data will be deleted. y/n: ')
-                                else:
-                                    load_input = 'y'
-                                if load_input == 'y':
-                                    cur_df = pd.read_pickle(pkl_path)
-                                    print(f'Loading dataframe from {os.path.abspath(pkl_path)}')
-                                    pickle_file_path = pkl_path
-                                else:
-                                    skip_update = True
-                                    warn_message.append('Cancelling load')
-                            else:
-                                skip_update = True
-                                warn_message.append('Cancelling load')
-                    elif _input.lower() == 'w':
-                        cur_df.to_pickle(pkl_path)
-                        print(f'Writing dataframe to {os.path.abspath(pkl_path)}')
-                        pickle_file_path = pkl_path
-                        print(f'ok')
-                        skip_update = True
-                # import dataframe
-                if _input == 'i':
-                    dataframe_update = True
-                    cur_df = import_data(cur_df)
-                    if cur_df is None:
-                        skip_update = True
-                        warn_message.append('Import canceled')
-                # export data
-                elif _input == 'e':
-                    for output,item in export.items():
-                        export_text = []
-                        variables = {}
-                        for _item in item:
-                            _type = _item.split(':')[0]
-                            _input = _item[len(_type)+1:]
-                            if _type == 'text':
-                                _string = evaluate_textstring(_input, variables)
-                                export_text.append(_string)
-                                print(_string)
-                            else: 
-                                _input_split = _input.split(';')
-                                par_type = _input_split[0]
-                                export_view = view
-                                export_view['type'] = par_type
-                                export_view['year'] = datetime.now().year
-                                name = ''
-                                _id = ''
-                                value = ''
-                                return_value = -99999999999
-                                export_filter = {}
-                                for _par in _input_split[1:]:
-                                    par_input_type = _par.split('=')[0]
-                                    par_input_input = _par.split('=')[1]
-                                    if par_input_type == 'key':
-                                        export_df,export_filter,export_view = set_view_and_filter(par_input_input,settings,export_view)
-                                    elif par_input_type == 'name':
-                                        name = par_input_input
-                                    elif par_input_type == 'id':
-                                        _id = par_input_input
-                                    elif par_input_type == 'value':
-                                        value = par_input_input
-                                    elif par_input_type == 'year':
-                                        export_view["year"] = int(par_input_input)
-                                    elif par_input_type == 'filter':
-                                        export_filter = set_filter(par_input_input,export_filter)
-                                if _type != 'df':
-                                    export_df = create_output(export_df,export_filter,export_view,categories,'df')
-                                else:
-                                    table_df = create_output(export_df,export_filter,export_view,categories,'table')
-                                if par_type == 'budget':
-                                    if 'current_month' == value:
-                                        _column = get_months(datetime.now().month)
-                                        if len(name) > 0:
-                                            return_value = export_df.loc[export_df['name'] == name, _column].values[0]
-                                        if len(_id) > 0:
-                                            return_value = export_df.loc[export_df['id'] == _id, _column].values[0]
-                                    elif 'current_month_sum' == value:
-                                        _column_sum = get_months(range(1,datetime.now().month+1))
-                                        if len(name) > 0:
-                                            return_value = export_df.loc[export_df['name'] == name, _column_sum].sum(axis=1).values[0]
-                                        if len(_id) > 0:
-                                            return_value = export_df.loc[export_df['id'] == _id, _column_sum].sum(axis=1).values[0]
-                                    else:
-                                        _column_sum = value
-                                        if len(name) > 0:
-                                            return_value = export_df.loc[export_df['name'] == name, _column_sum].sum(axis=1).values[0]
-                                        if len(_id) > 0:
-                                            return_value = export_df.loc[export_df['id'] == _id, _column_sum].sum(axis=1).values[0]
-                                elif par_type == 'posts':
-                                    if 'sum' in value:
-                                        return_value = export_df[value.split('.')[0]].sum()
-                                if _type == 'df':
-                                    pretty_table_string = table_df.get_string().splitlines()
-                                    export_text.extend(pretty_table_string)
-                                if par_type != 'df':
-                                    variables[_type] = return_value
-                        for output_item in output.split(','):
-                            if '@' in output_item:
-                                import smtplib
-                                import ssl
-                                import html
-                                from email.mime.text import MIMEText
-                                from email.mime.multipart import MIMEMultipart
-                                # Sender's email address and password
-                                sender_email = settings['email']['email']
-                                password = settings['email']['app_password']
-                                if len(password) != 16:
-                                    print('Email app password needs to be a 16 character key')
-                                
-                                # Create the MIME object
-                                message = MIMEMultipart()
-                                message["From"] = sender_email
-                                message["To"] = output_item
-                                message["Subject"] = export_text[0]
-                                
-                                # Add body to the email
-                                # Generate the email body
-                                body = "<html><body style='font-family: \"Courier New\", monospace;'>"
-                                
-                                for element in export_text[1:]:
-                                    if isinstance(element, str):
-                                        body += f"<pre>{html.escape(str(element))}</pre>"
-                                    else:
-                                        # Handle other cases if needed
-                                        pass
-                                
-                                body += "</body></html>"
-                                message.attach(MIMEText(body, "html"))
-                                
-                                # Establish a secure connection with the SMTP server
-                                context = ssl.create_default_context()
-                                
-                                with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
-                                    server.login(sender_email, password)
-                                    # Send the email
-                                    server.sendmail(sender_email, output_item, message.as_string())
-                            else:
-                                with open(output_item, 'w') as file:
-                                    for string_item in export_text:
-                                        file.write(f"{string_item}\n")
-                if _input[0] in 'pcfshdb' or _input.split(' ')[0] == 'auto' :
-                    if _input[0] == 'h':
-                        print_help('basic',view)
-                        skip_update = True
-                    # Change page
-                    if _input[0] == 'p':
-                        if _input == 'pn' or _input == 'pp':
-                            if _input == 'pn':
-                                add = 1
-                            else:
-                                add = -1
-                            view["page"] = str(int(view["page"]) + add)
-                        elif _input[0] == 'p':
-                            try:
-                                view["page"] = str(int(_input[1:]))
-                            except:
-                                skip_dummy = 0
-                        else: 
-                            view["page"] = '1'
-                    # Change budget year
-                    if _input[0] == 'b':
-                        if _input == 'bn' or _input == 'bp':
-                            if _input == 'bn':
-                                add = 1
-                            else:
-                                add = -1
-                            view["year"] = int(view["year"]) + add
-                    # Change filter filters
-                    if _input.split(' ')[0] == 'f':
-                        _split = _input.split(' ')
-                        filter_input = _input[len(_split[0])+1:]
-                        if len(_split) == 1:
-                            print_help('filter',view)
-                            print()
-                            print('Current:')
-                            print(df_filters)
-                            skip_update = True
-                        else:
-                            df_filters = set_filter(filter_input,df_filters)
-                    # Select detail
-                    if _input.split(' ')[0] == 'd':
-                        _split = _input.split(' ')
-                        if len(_split) == 1:
-                            print_help('detail',view)
-                        else:
-                            if view['type'] == 'posts':
-                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
-                                print(len(change_ids))
-                                if len(change_ids) == 1:
-                                    print()
-                                    print('***Imported/fixed data columns')
-                                    print(f'id: ' + str(cur_df.loc[change_ids,'id'].values[0]))
-                                    print(f'posted_date: ' + str(cur_df.loc[change_ids,'posted_date'].dt.strftime('%d %b %Y').values[0]))
-                                    print(f'text: ' + cur_df.loc[change_ids,'text'].values[0])
-                                    print(f'value: ' + str(cur_df.loc[change_ids,'value'].values[0]))
-                                    print(f'balance: ' + str(cur_df.loc[change_ids,'balance'].values[0]))
-                                    print(f'account: ' + cur_df.loc[change_ids,'account'].values[0])
-                                    print(f'info: ' + cur_df.loc[change_ids,'info'].values[0])
-                                    print(f'imported: ' + str(cur_df.loc[change_ids,'imported'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
-                                    print('***Category/changable data')
-                                    print(f'date: ' + str(cur_df.loc[change_ids,'date'].dt.strftime('%d %b %Y').values[0]))
-                                    cat_typ = cur_df.loc[change_ids,'category_type'].values[0]
-                                    cat = cur_df.loc[change_ids,'category'].values[0]
-                                    print(f'category_type: ' + str(cat_typ))
-                                    print(f'category: ' + cat)
-                                    if cat_typ != '':
-                                        category_name = categories[cat_typ]['name']
-                                        sub_category_name = categories[cat_typ][cat]
-                                        print(f'Category display name: {category_name} - {sub_category_name}')
-                                    print(f'amount: ' + str(cur_df.loc[change_ids,'amount'].values[0]))
-                                    print(f'split_id: ' + str(cur_df.loc[change_ids,'split_id'].values[0]))
-                                    print(f'marked: ' + cur_df.loc[change_ids,'marked'].values[0])
-                                    print(f'notes: ' + cur_df.loc[change_ids,'notes'].values[0])
-                                    print(f'status: ' + cur_df.loc[change_ids,'status'].values[0])
-                                    print(f'changed: ' + str(cur_df.loc[change_ids,'changed'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
-                            elif view['type'] == 'budget status':
-                                change_ids = create_output(cur_df,df_filters,view,None,_split[1:])
-                                #skip_update = True
-                            else:
-                                print('Only 1 selection allowed')
-                        skip_update = True
-
-                    # change dataframe
-                    elif _input.split(' ')[0] == 'c' or _input.split(' ')[0] == 'cd':
-                        _split = _input.split(' ')
-                        if len(_split) == 1:
-                            print_help('change',view)
-                            skip_update = True
-                        elif len(_split) >= 4 or _input.split(' ')[0] == 'cd':
-                            _column = find_column(_split[2],False)
-                            if _column is not None:
-                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
-                                if len(change_ids) > 0:
-                                    if _input.split(' ')[0] == 'cd':
-                                        _value = ''
-                                    else:
-                                        if _column == 'notes':
-                                            _value = ' '.join(_split[3:])
-                                        else:
-                                            _value = convert_value_to_data_type(cur_df,view,_column,_split[3])
-                                    if _value is not None:
-                                        if _column == 'category':
-                                            if _value != '':
-                                                _value = autocomplete_category(categories,_value)
-                                            else:
-                                                _value = ['','']
-                                            if _value is not None:
-                                                dataframe_update = True
-                                                cur_df = change_dataframe_rows(cur_df,view,_column,change_ids,_value[1])
-                                                cur_df = change_dataframe_rows(cur_df,view,'category_type',change_ids,_value[0])
-                                            else: skip_update = True
-                                        elif _column == 'marked':
-                                            if _value != '':
-                                                _value = autocomplete_marked(marked,_value)[0]
-                                            if _value is not None:
-                                                dataframe_update = True
-                                                cur_df = change_dataframe_rows(cur_df,view,_column,change_ids,_value)
-                                            else: skip_update = True
-                                        else:
-                                            dataframe_update = True
-                                            cur_df = change_dataframe_rows(cur_df,view,_column,change_ids,_value)
-                                    else: skip_update = True
-                            else: skip_update = True
-                    # auto categorize
-                    if _input.split(' ')[0] == 'auto':
-                        _split = _input.split(' ')
-                        if len(_split) > 1:
-                            id_sel = _split[1]
-                        else:
-                            id_sel = 'all'
-                        change_ids = create_output(cur_df,df_filters,view,None,id_sel)
-                        cur_df = auto_change_dataframe(cur_df,df_filters, view,auto_categories,change_ids)
-                        dataframe_update = True
-                    # Split category
-                    if _input.split(' ')[0] == 's' or _input.split(' ')[0] == 'sd':
-                        _split = _input.split(' ')
-                        if len(_split) == 1:
-                            print_help('split',view)
-                            skip_update = True
-                        elif len(_split) >= 3 or _input.split(' ')[0] == 'sd': 
-                            if _input.split(' ')[0] == 'sd':
-                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
-                                if len(change_ids) > 0:
-                                    cur_df = delete_split_dataframe_rows(cur_df, change_ids)
-                                else: skip_update = True
-                            else:
-                                change_ids = create_output(cur_df,df_filters,view,None,_split[1])
-                                if len(change_ids) > 0:
-                                    try:
-                                        new_value = float(_split[2])
-                                    except:
-                                        new_value = _split[2]
-                                    if new_value is not None and len(str(new_value)) > 0:
-                                        if len(_split) > 3 and len(_split[3]) > 0: #Create new_category
-                                            new_cat = autocomplete_category(categories,_split[3])
-                                            if not new_cat == None:
-                                                no_cat = False
-                                            else:
-                                                no_cat = True
-                                            while no_cat:
-                                                print('No category found')
-                                                _cat_q = input('Search again? y/n, or c for cancel: ')
-                                                #_cat_q = input()
-                                                if _cat_q[0].lower() == 'y':
-                                                    _cat_input = input('search string: ')
-                                                    new_cat = autocomplete_category(categories,_cat_input)
-                                                    if not new_cat == None:
-                                                        no_cat = False
-                                                elif _cat_q[0].lower() == 'c':
-                                                    new_cat = None
-                                                    no_cat = False
-                                                    print('Skipping command')
-                                                elif _cat_q[0].lower() == 'n':
-                                                    new_cat = ''
-                                                    no_cat = False
-                                        else:
-                                            new_cat = '' # Splits to same category
-                                        if new_cat is not None:
-                                            if len(_split) > 4: #Create new_mark 
-                                                new_mark = autocomplete_marked(marked,_split[4])
-                                            else:
-                                                new_mark = ''
-                                            if len(_split) > 5: #Create note 
-                                                if _split[5][0] == 'y':
-                                                    print('Enter new note')
-                                                    new_note = input('')
-                                            else:
-                                                new_note = ''
-                                            dataframe_update = True
-                                            cur_df = split_dataframe_rows(cur_df, change_ids, new_value, new_cat, new_mark, new_note)
-                                        else: skip_update = True
-                                    else: skip_update = True
-                                else: skip_update = True
+                # Handle user input
+                split_input = shlex.split(_input)
+                cur_df,df_filters,view = handle_user_input(split_input,cur_df,df_filters,view)
 
                 # Updates view
-                elif _input[0] == 'q':
-                    if _input == 'qw':
+                if split_input[0][0] == 'q':
+                    if split_input[0] == 'qw':
                         _q_input = 'w'
-                    elif _input == 'q!':
+                    elif split_input[0] == 'q!':
                         _q_input = 'y'
                     else:
                         print('Are you sure you want to quit without saving?')
@@ -2174,10 +2364,16 @@ if __name__ == '__main__':
                 else:
                     #Update view
                     a = 0
+                if not skip_update or dataframe_update:
+                    if cur_df is not None:  
+                        if view["type"] == 'posts':
+                            cur_df = check_and_correct_df(cur_df)
                 if not skip_update:
-                    view = create_output(cur_df,df_filters,view,categories)
+                    view = create_output(cur_df,df_filters,view)
                 else:
                     skip_update = False
+
+
                 if dataframe_update:
                     if cur_df is not None:  
                         if view["type"] == 'posts':
@@ -2194,23 +2390,24 @@ if __name__ == '__main__':
                 traceback_str = traceback.format_exc()
                 # Print or log the traceback string
                 warn_message.append(f"Error: {traceback_str}")
-                '''
-                if view["type"][:min(6,len(view["type"]))] == 'budget':
-                    if view["year"] == 0:
-                        view["year"] = datetime.now().year
-                    if view["year"] in budgets:
-                        cur_df = budgets[view["year"]]
-                        if view["group"] == 'category':
-                            cur_df = group_and_sum_rows(cur_df,1)
-                '''
                 try:
-                    if len(dfs_history) and view['type'] == 'plots':
+                    if len(dfs_history) and view['type'] == 'posts':
                         cur_df = dfs_history[current_history_index].copy()
+                        if cur_df is not None:  
+                            if view["type"] == 'posts':
+                                cur_df = check_and_correct_df(cur_df)
+                except Exception as e:
+                    traceback_str = traceback.format_exc()
+                try:
+                    if not skip_update or dataframe_update:
+                        if cur_df is not None:  
+                            if view["type"] == 'posts':
+                                cur_df = check_and_correct_df(cur_df)
                 except Exception as e:
                     traceback_str = traceback.format_exc()
                 try:
                     if cur_df != None and len(cur_df):
-                        view = create_output(cur_df,df_filters,view,categories)
+                        view = create_output(cur_df,df_filters,view)
                 except Exception as e:
                     traceback_str = traceback.format_exc()
                 warn_message.append(f"Change command and try again.")

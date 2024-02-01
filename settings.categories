@@ -1,5 +1,6 @@
 *Categories
 # Number for category name. letter for sub category name
+#Indkomst;indkomst
 1;Indkomst;indkomst
 a;Anden indkomst
 b;Børnepenge
@@ -9,17 +10,20 @@ e;Løn
 f;Overskydende skat
 g;Renteindtægter
 h;SU & studielån
+#Husholdning;forbrug
 2;Husholdning;forbrug
 a;Apotek
 b;Dagligvarer
 c;Kantine
 d;Kiosk, bager & specialbutikker
+#Bolig;regninger
 3;Bolig;regninger
 a;Andre boligudgifter
 b;Boliglån & husleje
 c;El, vand & varme
 d;Indbo- & familieforsikring
 e;Vedligeholdelse
+#Transport;regninger
 4;Transport;regninger
 a;Anden transport
 b;Bilforsikring
@@ -30,6 +34,7 @@ f;Grøn ejerafgift
 g;Kørselsordning
 h;Parkering
 i;Værksted & reservedele
+#Øvrige faste;regninger
 5;Øvrige faste;regninger
 a;Briller & kontaktlinser
 b;Fagforening & A-kasse
@@ -39,6 +44,7 @@ e;Studieudgifter
 f;Sundheds- & sygeforsikring
 g;Telefoni & internet
 h;TV & streamingstjenester
+#Privatforbrug;forbrug
 6;Privatforbrug;forbrug
 a;Andet
 b;Babyudstyr
@@ -59,6 +65,7 @@ p;Spil & legetøj
 q;Sport & fritid
 r;Tobak & alkohol
 s;Tøj & sko
+#Ferie;forbrug
 7;Ferie;forbrug
 a;Billeje
 b;Transport
@@ -68,20 +75,24 @@ e;Hotel
 f;Mad
 g;Rejseforsikring
 h;Shopping
+#Diverse;regninger
 8;Diverse;regninger
 a;Bankgebyr
 b;Behandling & læger
 c;Bøder & afgifter
 d;Restskat
+#Lån;regninger
 9;Lån;regninger
 a;Forbrugslån
 b;Privatlån
 c;Studielån
+#Opsparing;opsparing
 10;Opsparing;opsparing
 a;Børneopsparing
 b;Opsparingskonto
 c;Pension
 d;Værdipapirer
+#Vis ikke;ignore
 11;Vis ikke;ignore
 a;Ignorer
 b;Kontooverførsel
@@ -91,36 +102,57 @@ c;Udlæg
 marked=jakob;info=XXXX 1056,XXXX1056,XXXX 9890,XXXX9890
 marked=stephanie;info=XXXX 1130,XXXX1130,XXXX 9700,XXXX9700
 #indkomst
+category=anden indkomst;text=boligbonus
 category=løn;date=first;text=lønoverførsel,månedsløn
+category=børnepenge;date=first;text=ungeydelse
 category=feriepenge;text=feriepenge
 category=rente;text=rente;value>0
 #dagligvare
 cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,abc-super,lidl,aldi,coop,føtex,normal,bilka,foetex
-cat=apotek;marked=;text=apotek
+cat=apotek;marked=;text=apotek,med24,apopro
+cat=kantine;text=kba gød,cheval
+cat=kiosk;text=7-eleven
 #Bolig
 category=boliglån;marked=;date=first;text=totalkredit
+category=andre bolig;text=herning kommune;value>-1800
+category=andre bolig;text=aarhus bolig,A. Christensen
 category=indbo;info=indboforsikring;text=tryg
 category=varme;text=verdo,vand
+category=vedligehold;text=jem & fix,jem&fix,harald,billigblomst,bauhaus
 #Transport
-category=brændstof;text=q8,ingo,circle,f24
+category=brændstof;marked=;text=q8,ingo,circle,f24, ok
+category=parkering;marked=;text=easypark,parkering
 category=bilkøb;text=al finans
 category=anden transport;marked=;text=wash world
 category=bilforsikring;info=motorkøretøj;text=tryg
 #Ovrige faste
-category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa
+category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,norlys digital
 category=streaming;text=mobilepay claus hors;value=440
 category=telefoni;marked=;text=call me,cbb
 category=kontaktlinse;text=kontaktlinse
 category=ulykke;info=børneforsikring,ulykkesforsikring;text=tryg
-category=fagforening;text=a-kasse,dbio,ida,lønsikring
+category=sygeforsikring;text=sygeforsikringen danmark
+category=fagforening;text=a-kasse,dbio,danske bioanalytiker,ida,lønsikring
+category=institution;marked=;text=lundgaardskolen
+category=institution;marked=;text=herning kommune;value<-1800
 #Privatforbrug
+#frisør
 category=andet;text=rdfg
 category=fastfood;text=pizza,just-eat,burger
+category=frisør;marked=;text=frisør,katja ø
 category=biograf;text=nfb
 category=elektronik;text=power,elgiganten,proshop
-category=møbler;text=biltema,jysk
+category=møbler;text=biltema,jysk,basic & more,ikea
 category=gaver;text=br herning
 category=software;text=google play,apple.com,apps
+category=software;marked=;text=google play;value=-34
+category=software;marked=;text=mambeno
+category=hobby;marked=;text=gør det se
+category=hobby;text=BOG-IDE,hobbii
 category=Sport & fritid;text=gry dans
-category=tøj & sko;text=h&m,snt,boozt,reshopper
+category=tøj & sko;text=h&m,snt,boozt,reshopper,klarna,babysam,viabill,stroempe
 #category=ulykke;info=børneforsikring,ulykkeforsikring;text=q8,ingo,circle,f24
+#Gaeld
+category=9c;text=studiegæld
+#Opsparing
+category=opsparingskonto;text=opsparing
