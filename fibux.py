@@ -107,6 +107,53 @@ def import_settings(_type):
                             marked[mark_name]['end'].append(end_date)
                             marked[mark_name]['value'].append(value)
         return marked
+    elif _type == 'dept':
+        with open("settings." + _type) as f:
+            content = f.read()
+
+        all_lines = content.strip().split('\n')
+        loans = []
+        parameters = {}
+        for line in all_lines:
+            used_part = line.split('#')[0]
+            if len(used_part):
+                if 'name:' == used_part[:5].lower():
+                    if len(parameters):
+                        loans.append(parameters)
+                        parameters = {}
+                    parameters = {}
+                    parameters['name'] = line.strip().split(';')[0]
+                    parameters['filter'] = line.strip().split(';')[1:]
+                elif len(parameters):
+                    key = re.split(':|=',line,1)[0].strip()
+                    value = re.split(':|=',line,1)[1].strip()
+                    parameters[key] = value
+        if len(parameters):
+            loans.append(parameters)
+
+        '''
+            if len(parameters):
+                if len(loan_name)
+
+        loans_details = re.split(r'name:', content)[1:]  # Split content into individual loans
+        loans = []
+
+        for loan in loans_details:
+            parameters = {}
+            lines = loan.strip().split('\n')
+            parameters['name'] = lines[0].strip().split(';')[0]
+            parameters['filter'] = lines[0].strip().split(';')[1:]
+            
+            for line in lines[1:]:
+                if len(line) and line.strip()[0] != '#':
+                    print(line)
+                    key = re.split(':|=',line,1)[0].strip()
+                    value = re.split(':|=',line,1)[1].strip()
+                    parameters[key] = value
+
+            loans.append(parameters)
+        '''
+        return loans
     elif _type == 'import' and False:
         # Convert the string representation to a dictionary using ast.literal_eval
         settings = {}
@@ -508,6 +555,10 @@ def create_output(df,df_fil,v,output_method=0):
                 df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
             if page < pages: 
                 df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
+    if len(df_sorted) == 0:
+        print('Filter does not return any posts')
+        print(df_fil)
+        #return df_sorted
     
     if output_method == 0 or output_method == 'df' or output_method == 'table':
         for date_column in ['posted_date','date','imported','changed']:
@@ -565,7 +616,7 @@ def create_output(df,df_fil,v,output_method=0):
         if output_method == 'df':
             return df_sorted
         if output_method != 'table':
-            df_sorted.loc[:,'select'] = range(len(df_sorted), 0, -1)
+            df_sorted.loc[:,'select'] = range(1,len(df_sorted) + 1)
             print_col = list(['select'] + print_col)
             if 'budget' in v['type']:
                 df_total.loc[0,'select'] = ''
@@ -600,7 +651,7 @@ def create_output(df,df_fil,v,output_method=0):
             else:
                 _list = convert_string_to_list(output_method)
                 n = len(df_sorted)  # number of rows in the DataFrame
-                sel_list = [n - i for i in _list]  # convert to zero-based indices
+                sel_list = [-1 + i for i in _list]  # convert to zero-based indices
                 return df_sorted.iloc[sel_list]['id']
 
 def filter_dataframe(df, df_filter,get_ids=False):
@@ -735,6 +786,7 @@ def find_column(input_string,read_only=True):
             'cat': 'category',
             'dat': 'date',
             'sta': 'status',
+            'inf': 'info',
             'mar': 'marked'
         }
     # Get the first 3 characters of the input string
@@ -1949,6 +2001,7 @@ def split_dataframe_handle(_input,df,df_filt,vi):
 
 def handle_user_input(user_input,df,df_filt,vi):
     global dataframe_update
+    global skip_update
     global warn_message
     global current_history_index
     # Undo and redo dataframe changes
@@ -2004,7 +2057,7 @@ def handle_user_input(user_input,df,df_filt,vi):
         if len(user_input) == 1:
             print_help('filter',view)
         else:
-            df_filters = set_filter(user_input[1:],df_filt)
+            df_filt = set_filter(user_input[1:],df_filt)
     # Show detail
     elif user_input[0] == 'd':
        if len(user_input) == 1:
@@ -2026,6 +2079,12 @@ def handle_user_input(user_input,df,df_filt,vi):
         change_ids = create_output(df,df_filt,vi,id_sel)
         df = auto_change_dataframe(df,df_filt, vi,change_ids)
         dataframe_update = True
+    # Calc loans
+    elif user_input[0] == 'dept':
+        loan_parameters = substitute_parameters(df,vi,settings['dept'])
+        annuity_table = calculate_annuity_table(loan_parameters)
+        print_annuity_table(annuity_table)
+        skip_update = True
     # Split dataframe
     elif user_input[0] == 's':
         if len(user_input) == 1:
@@ -2128,6 +2187,331 @@ def check_and_correct_df(df):
         print(zero_value_split_minus_one_rows[['id', 'text']])
     '''
     return df
+
+def calculate_annuity_table(loan_parameters):
+    """
+    Calculate the annuity table based on loan parameters.
+    """
+    annuity_tables = []
+
+    for loan in loan_parameters:
+        name = loan['name'][5:]
+        annuity_table = []
+        dept = loan['dept']  # Current dept
+        date = loan['date'].replace(day=1)  # Set day to 1st of the month to consider only month and year
+        yearly_payments = loan['yearly_payments']
+        interest_rate = loan['interest_rate']  # Interest_rate in fraction
+        processing_fee = loan['processing_fee_value']  # Processing fee value at each payment
+        processing_fee_rate = loan['processing_fee_rate']  # Yearly processing fee rate at each payment
+        processing_fee_rate_value = loan['processing_fee_rate_value']
+        annuity_payment = loan['annuity_payment'] # Specified annuity payment
+        total_payment = loan['payment']
+        installment_payment = loan['installment']
+        interest_payment = loan['interest_value']
+
+        # Calculate annuity interest rate
+        r = interest_rate / yearly_payments
+        annuity_table.append({
+            'date': date,
+            'dept': dept,
+            'payment': total_payment,
+            'installment': installment_payment,
+            'interest': interest_payment,
+            'processing_fee': processing_fee,
+            'processing_fee_rate': processing_fee_rate_value,  # Adjust processing fee for remaining debt
+            'total_fee': processing_fee_rate_value + processing_fee
+        })
+        new_year = date.year 
+        while dept > 0 and len(annuity_table) < 1000:
+            interest_payment = dept * r  # Interest payment for this period
+            installment_payment = annuity_payment - interest_payment  # Principal payment for this period
+            # Ensure the last payment doesn't exceed the remaining debt
+            if installment_payment > dept:
+                installment_payment = dept
+
+            processing_fee_rate_value = dept * processing_fee_rate / yearly_payments
+            total_fee = processing_fee_rate_value + processing_fee
+            # Add processing fee to the payment
+            total_payment = annuity_payment + total_fee
+
+
+            dept -= installment_payment
+            # Advance to the next month
+            new_month = date.month + int(12/yearly_payments)
+            if new_month > 12:
+                new_year = date.year + int((new_month-1)/12) 
+                new_month = new_month - int(new_month/13)*12
+            date = datetime(new_year, new_month, 1)
+            #date = datetime(date.year + (date.month + 1) // 12, ((date.month + 1) % 12) + 1, 1)  # Move to next month, considering year rollover
+
+            # Append payment details to the annuity table
+            annuity_table.append({
+                'date': date,
+                'dept': dept,
+                'payment': total_payment,
+                'installment': installment_payment,
+                'interest': interest_payment,
+                'processing_fee': processing_fee,
+                'processing_fee_rate': processing_fee_rate_value,
+                'total_fee': total_fee
+            })
+        annuity_tables.append({'name':name,'parameters':loan,'table':pd.DataFrame(annuity_table)})
+
+
+    return annuity_tables
+
+def print_annuity_table(annuity_tables):
+    table = pt()
+    table.field_names = ["Name", "Dept", "Interest %", "Next Payment", "Amount","Interest Value", "Installment", "Fee","Paid out"]
+    _table_align = ["l","r","r","c","r","r","r","r","c"]
+    
+    for entry in annuity_tables:
+        name = entry['name']
+        parameters = entry['parameters']
+        table_df = entry['table']
+        dept = "{:,.0f}".format(table_df.iloc[0]['dept']) if len(table_df) > 1 else "N/A"
+        interest = "{:.2f}".format(parameters['interest_rate']*100) if 'interest_rate' in parameters else "N/A"
+        paid_out = table_df.iloc[-1]['date'].strftime("%Y-%m") if len(table_df) > 1 else "N/A"
+        next_payment = table_df.iloc[1] if len(table_df) > 1 else None
+        if next_payment is not None:
+            np_date = next_payment['date'].strftime("%Y-%m")
+            np_amount = "{:,.0f}".format(next_payment['payment'])
+            np_interest = "{:,.0f}".format(next_payment['interest'])
+            np_installment = "{:,.0f}".format(next_payment['installment'])
+            np_fee = "{:,.0f}".format(next_payment['total_fee'])
+        else:
+            np_date = "N/A"
+            np_amount = "N/A"
+            np_interest = "N/A"
+            np_installment = "N/A"
+            np_fee = "N/A"
+        table.add_row([
+            name,
+            dept,
+            interest,
+            np_date,
+            np_amount,
+            np_interest,
+            np_installment,
+            np_fee,
+            paid_out
+        ])
+    for col, align in zip(table.field_names,_table_align):
+        table.align[col] = align
+    
+    print(table)
+
+def calc_parameters(key,value,df,substituted_loan,mode=''):
+    if '{' in value and '}' in value:
+        if mode == '':
+            for param in re.findall(r'{(.*?)}', value):
+                if param not in substituted_loan:
+                    substituted_loan = calc_missing_parameters(param,df,substituted_loan)
+                value = value.replace(f'{{{param}}}', str(substituted_loan[param]))
+            substituted_loan[key] = float(eval(value))
+    elif '[d]' in value or '[dd]' in value:
+        # Handle [d] or [dd] for values after ':'
+        if mode == '':
+            search_string = df.iloc[-1]['info'] 
+        elif mode == '_last':
+            search_string = df.iloc[-2]['info'] 
+        if '[dd]' in value:
+            val2 = value.replace('[d]','').replace('[dd]','').strip()
+            search_string =  search_string.strip().replace(val2,'!value_code!')
+            search_string = search_string.replace('.','!pre!').replace(',','.').replace('!pre!',',')
+            search_string = search_string.replace('!value_code!',val2)
+        # Define the placeholder patterns
+        #placeholder_patterns = {'[d]': r'([\d,]+(\.\d*)?)', '[dd]': r'([\d,]+(\.\d*)?)'}
+        #placeholder_patterns = {' [d]': r'\s+([\d,]+(\.\d*)?)', '[d]': r'([\d,]+(\.\d*)?)'}
+        #                                  \s+([\d,]+(?:\.\d*[1-9])?)
+        #placeholder_patterns = {' [d]': r'\s+([\d,]+(?:\.\d*[1-9])?)', '[d]': r'([\d,]+(\.\d*)?)'}
+        placeholder_patterns = {' [d]': r'\s+([\d,]+(?:,\d{3})*(?:\.\d*)?)', '[d]': r'([\d,]+(\.\d*)?)'}
+        #                                  \s+([\d,]+(?:,\d{3})*(?:\.\d*)?)'
+        
+        # Define your original pattern
+        pattern = value.replace('[dd]','[d]')
+
+        n_res = pattern.count('[d]')
+        
+        # Replace placeholders with their corresponding regular expression patterns
+        for placeholder, regex_pattern in placeholder_patterns.items():
+            pattern = pattern.replace(placeholder, regex_pattern)
+
+        #value2 = value.replace(' [d]', r'\s+([\d,]+(\.\d*)?)').replace(' [dd]',r'\s+([\d,]+(\.\d*)?)')
+        #digits_match = re.search( value2,search_string)
+        digits_match = re.search(pattern,search_string)
+        if digits_match != None:
+            substituted_loan[key+mode] = float(digits_match.group(n_res).replace(',',''))
+        else:
+            if key+mode in substituted_loan:
+                del substituted_loan[key+mode]
+    elif value.isdigit() and  mode == '':
+        substituted_loan[key] = float(value)
+    elif mode == '':
+        print(f"Error for key {key}")
+    return substituted_loan
+ 
+def substitute_parameters(df,view,loan_parameters):
+    """
+    Substitute parameters enclosed in curly braces {} with their corresponding values.
+    """
+    substituted_parameters = []
+    def_filter = {"key": "", "type": "posts","sort": {"column": "date", "direction": "des"},"sort2": {"column": "id", "direction": "des"}}
+
+    for loan in loan_parameters:
+        substituted_loan = loan.copy()
+        substituted_loan = set_default_parameters(substituted_loan)
+        df_filt = def_filter.copy()
+        split_characters = ['>', '<', '=']
+        for filt in loan['filter']:
+            column = find_column(re.split(f'[{"".join(split_characters)}]', filt)[0])
+            split_character = next(char for char in filt if char in split_characters)
+            value = filt.split(split_character)[1].strip()
+            if column in ['text','info','user_notes','category_id','account','category','status','marked','notes']:
+                incl_sc = ''
+            else:
+                incl_sc = split_character
+            df_filt = set_filter([column,incl_sc + value],df_filt)
+        _df = create_output(df,df_filt,view,'df')
+        if len(df) == 0:
+            break
+        if 'yearly_payments' not in loan:
+            if len(_df) > 1:
+                # Calculate the difference in months
+                date1 = _df.iloc[-1]['date']
+                date2 = _df.iloc[-2]['date']
+                
+                # Calculate difference in months
+                months_diff = (date1.year - date2.year) * 12 + (date1.month - date2.month) 
+                substituted_loan['yearly_payments'] = int(round(12/months_diff))
+            else:
+                substituted_loan['yearly_payments'] = 12
+        # Create df from filter
+        if 'payment' not in loan:
+            substituted_loan['payment'] = _df.iloc[-1]['amount']*(-1)
+            if len(_df) > 1:
+                if 'payment_last' not in loan:
+                    substituted_loan['payment_last'] = _df.iloc[-2]['amount']*(-1)
+        if 'date' not in loan:
+            substituted_loan['date'] = _df.iloc[-1]['date']
+            if len(_df) > 1:
+                if 'date_last' not in loan:
+                    substituted_loan['date_last'] = _df.iloc[-2]['date']
+        for loop in range(2):
+            if len(_df) > 1:
+                for key, value in loan.items():
+                    if key not in ['name','filter']:
+                        if key + '_last' not in loan:
+                            substituted_loan = calc_parameters(key,value,_df,substituted_loan,'_last')
+            for key, value in loan.items():
+                if key not in ['name','filter']:
+                    search_string = _df.iloc[-1]['info'] 
+                    substituted_loan = calc_parameters(key,value,_df,substituted_loan)
+        if 'processing_fee_value' not in loan:
+            substituted_loan['processing_fee_value'] = 0.0
+        changed = 100
+        while changed > 0:
+            old_len = len(substituted_loan)
+            substituted_loan = calc_missing_parameters('all',_df,substituted_loan)
+            new_len = len(substituted_loan)
+            changed = new_len - old_len
+
+
+        substituted_parameters.append(substituted_loan)
+
+    return substituted_parameters
+
+
+def calc_missing_parameters(calc_val,df,sl):
+    def calc_interest_rate(sl,mode=''):
+        if 'interest_rate' not in sl:
+            if all(string in sl for string in ['interest_rate_p']):
+                sl['interest_rate'] = sl['interest_rate_p']/100
+            elif all(string in sl for string in ['interest_value'+mode,'dept_last'+mode,'yearly_payments']):
+                sl['interest_rate'] = sl['yearly_payments'] * sl['interest_value'+mode] / sl['dept_last'+mode]
+        return sl
+    def calc_interest_value(sl,mode=''):
+        if 'interest_value'+mode not in sl:
+            if all(string in sl for string in ['interest_rate','dept_last'+mode,'yearly_payments']):
+                sl['interest_value'+mode] = sl['dept_last'+mode]*sl['interest_rate']/sl['yearly_payments']
+            elif all(string in sl for string in ['installment'+mode,'payment'+mode,'total_processing_value'+mode]):
+                sl['interest_value'+mode] = sl['payment'+mode]-sl['processing_fee_value'+mode] -sl['installment'+mode]
+        return sl
+    def calc_total_processing_value(sl,mode=''):
+        if 'total_processing_fee'+mode not in sl:
+            if all(string in sl for string in ['processing_fee_value'+mode,'processing_fee_rate','dept_last'+mode,'yearly_payments']):
+                sl['total_processing_value'+mode] = sl['processing_fee_value'+mode] + sl['processing_fee_rate']/sl['yearly_payments']*sl['dept_last'+mode]
+            elif all(string in sl for string in ['interest_value'+mode,'payment'+mode,'installment'+mode]):
+                sl['total_processing_value'+mode] = sl['payment'+mode]-sl['interest_value'+mode]-sl['installment'+mode]
+        return sl
+    def calc_installment(sl,mode=''):
+        if 'installment'+mode not in sl:
+            if all(string in sl for string in ['interest_value'+mode,'payment'+mode,'total_processing_value'+mode]):
+                sl['installment'+mode] = sl['payment'+mode] - sl['total_processing_value'+mode] - sl['interest_value'+mode]
+            if all(string in sl for string in ['dept'+mode,'dept_last'+mode]):
+                sl['installment'+mode] = sl['dept_last'+mode] - sl['dept'+mode]
+        return sl
+    def calc_annuity_payment(sl):
+        if 'annuity_payment' not in sl:
+            if all(string in sl for string in ['total_processing_value','payment']):
+                sl['annuity_payment'] = sl['payment'] - sl['total_processing_value']
+        return sl
+    def calc_processing_fee_rate(sl,mode=''):
+        if 'processing_fee_rate' not in sl:
+            if all(string in sl for string in ['processing_fee_rate_value'+mode,'dept_last'+mode,'yearly_payments']):
+                sl['processing_fee_rate'] = sl['yearly_payments'] * sl['processing_fee_rate_value'+mode] / sl['dept_last'+mode]
+        return sl
+    def calc_processing_fee_rate_value(sl,mode=''):
+        if 'processing_fee_rate_value'+mode not in sl:
+            if all(string in sl for string in ['processing_fee_rate','dept_last'+mode,'yearly_payments']):
+                sl['processing_fee_rate_value'+mode] = sl['processing_fee_rate']/ sl['yearly_payments'] / sl['dept_last'+mode]
+        return sl
+    def calc_dept(sl,mode=''):
+        if 'dept'+mode not in sl:
+            if all(string in sl for string in ['dept_last'+mode,'installment'+mode]):
+                sl['dept'+mode] = sl['dept_last'+mode] - sl['installment'+mode]
+        return sl
+    if calc_val == 'all' or calc_val == 'interest_rate':
+        if 'interest_rate' not in sl or not isinstance(sl['interest_rate'],float):
+            sl = calc_interest_rate(sl,'_last')
+            sl = calc_interest_rate(sl)
+    if calc_val == 'all' or calc_val == 'interest_value':
+        if 'interest_value' not in sl or not isinstance(sl['interest_value'],float):
+            sl = calc_interest_value(sl,'_last')
+            sl = calc_interest_value(sl)
+    if calc_val == 'all' or calc_val == 'processing_fee_rate':
+        if 'processing_fee_rate' not in sl or not isinstance(sl['processing_fee_rate'],float):
+            sl = calc_processing_fee_rate(sl,'_last')
+            sl = calc_processing_fee_rate(sl)
+    if calc_val == 'all' or calc_val == 'processing_fee_rate_value':
+        if 'processing_fee_rate_value' not in sl or not isinstance(sl['processing_fee_rate_value'],float):
+            sl = calc_processing_fee_rate_value(sl,'_last')
+            sl = calc_processing_fee_rate_value(sl)
+    if calc_val == 'all' or calc_val == 'total_processing_value':
+        if 'total_processing_value' not in sl or not isinstance(sl['total_processing_value'],float):
+            sl = calc_total_processing_value(sl,'_last')
+            sl = calc_total_processing_value(sl)
+    if calc_val == 'all' or calc_val == 'installment':
+        if 'installment' not in sl or not isinstance(sl['installment'],float):
+            sl = calc_installment(sl,'_last')
+            sl = calc_installment(sl)
+    if calc_val == 'all' or calc_val == 'dept':
+        if 'dept' not in sl or not isinstance(sl['dept'],float):
+            sl = calc_dept(sl,'_last')
+            sl = calc_dept(sl)
+    if calc_val == 'all' or calc_val == 'interest_value':
+        if 'annuity_payment' not in sl or not isinstance(sl['annuity_payment'],float):
+            sl = calc_annuity_payment(sl)
+    return sl
+
+def set_default_parameters(substituted_parameters):
+    if 'processing_fee_value' not in substituted_parameters:
+        substituted_parameters['processing_fee'] = 0.0
+    if 'processing_fee_rate' not in substituted_parameters and 'processing_fee_rate_value' not in substituted_parameters:
+        substituted_parameters['processing_fee_rate'] = 0.0
+    if 'yearly_payments' not in substituted_parameters:
+        substituted_parameters['yearly_payments'] = 12
+    return substituted_parameters
 
 def print_help(commands,view):
     global skip_update
@@ -2261,6 +2645,7 @@ def initialize_settings():
     settings['email'] = email_settings
     settings['marked'] = import_settings('marked')
     settings['export'] = import_settings('export')
+    settings['dept'] = import_settings('dept')
     settings['categories'],settings['auto_categories'] = import_settings('categories')
     settings = convert_delta_filter_time(settings)
     return settings

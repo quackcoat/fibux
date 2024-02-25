@@ -115,7 +115,7 @@ cat=kiosk;text=7-eleven
 #Bolig
 category=boliglån;marked=;date=first;text=totalkredit
 category=andre bolig;text=herning kommune;value>-1800
-category=andre bolig;text=aarhus bolig,A. Christensen
+category=andre bolig;text=aarhus bolig,A. Christensen,lundmølle
 category=indbo;info=indboforsikring;text=tryg
 category=varme;text=verdo,vand
 category=vedligehold;text=jem & fix,jem&fix,harald,billigblomst,bauhaus
