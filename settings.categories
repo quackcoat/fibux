@@ -103,15 +103,16 @@ marked=jakob;info=XXXX 1056,XXXX1056,XXXX 9890,XXXX9890
 marked=stephanie;info=XXXX 1130,XXXX1130,XXXX 9700,XXXX9700
 #indkomst
 category=anden indkomst;text=boligbonus
+category=overskydende skat;text=overskydende skat
 category=løn;date=first;text=lønoverførsel,månedsløn
 category=børnepenge;date=first;text=ungeydelse
 category=feriepenge;text=feriepenge
 category=rente;text=rente;value>0
 #dagligvare
-cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,abc-super,lidl,aldi,coop,føtex,normal,bilka,foetex
+cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,superlavpris,lidl,aldi,coop,føtex,normal,bilka,foetex,løvbjerg,kvickly,kaffeagent,meny,pant app
 cat=apotek;marked=;text=apotek,med24,apopro
 cat=kantine;text=kba gød,cheval
-cat=kiosk;text=7-eleven
+cat=kiosk;text=7-eleven,bager
 #Bolig
 category=boliglån;marked=;date=first;text=totalkredit
 category=andre bolig;text=herning kommune;value>-1800
@@ -121,12 +122,13 @@ category=varme;text=verdo,vand
 category=vedligehold;text=jem & fix,jem&fix,harald,billigblomst,bauhaus
 #Transport
 category=brændstof;marked=;text=q8,ingo,circle,f24, ok
+category=ejerafgift;marked=;text=skattestyrelsen motor
 category=parkering;marked=;text=easypark,parkering
 category=bilkøb;text=al finans
 category=anden transport;marked=;text=wash world
 category=bilforsikring;info=motorkøretøj;text=tryg
 #Ovrige faste
-category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,norlys digital
+category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,norlys digital,turgame
 category=streaming;text=mobilepay claus hors;value=440
 category=telefoni;marked=;text=call me,cbb
 category=kontaktlinse;text=kontaktlinse
@@ -137,20 +139,21 @@ category=institution;marked=;text=lundgaardskolen
 category=institution;marked=;text=herning kommune;value<-1800
 #Privatforbrug
 #frisør
-category=andet;text=rdfg
-category=fastfood;text=pizza,just-eat,burger
+category=andet;text=gls
+category=fastfood;text=pizza,just-eat,burger,restaurant
 category=frisør;marked=;text=frisør,katja ø
 category=biograf;text=nfb
-category=elektronik;text=power,elgiganten,proshop
-category=møbler;text=biltema,jysk,basic & more,ikea
+category=elektronik;text=power,elgiganten,proshop,av-cables,batteri
+category=møbler;text=biltema,jysk,basic & more,ikea, SG,bucketbloom
 category=gaver;text=br herning
 category=software;text=google play,apple.com,apps
 category=software;marked=;text=google play;value=-34
 category=software;marked=;text=mambeno
-category=hobby;marked=;text=gør det se
-category=hobby;text=BOG-IDE,hobbii
-category=Sport & fritid;text=gry dans
-category=tøj & sko;text=h&m,snt,boozt,reshopper,klarna,babysam,viabill,stroempe
+category=hobby;marked=;text=gør det se,bonnier
+category=hobby;text=BOG-IDE,hobbii,garnshoppen,panduro,yarn,butiksmusak
+category=legetøj;text=børnenes kartel
+category=Sport & fritid;text=gry dans,tjoerringif
+category=tøj & sko;text=h&m,snt,boozt,reshopper,klarna,babysam,viabill,stroempe,nanna xl,coolsko,minijacobi,zizzi,bylindgren
 #category=ulykke;info=børneforsikring,ulykkeforsikring;text=q8,ingo,circle,f24
 #Gaeld
 category=9c;text=studiegæld
