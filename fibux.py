@@ -255,7 +255,52 @@ def add_missing_columns(data):
     data[add_col[1:]] = data[add_col[1:]].fillna('')
     return data
 
-def import_data(input_df=None,new=False):
+def import_change_by_id(df):
+    import_setting = import_settings('import_change')
+    headers = import_setting["headers"]
+    csv_sep = import_setting["csv_sep"]
+    decimal_sep = import_setting["decimal_sep"]
+    thousand_sep = import_setting["thousand_sep"]
+    date_format = import_setting["date_format"]
+    import_folder = import_setting.get("import_folder", None)
+    csv_encoding = import_setting["csv_encoding"]
+
+    found_csv = False
+    # find newest csv file in folder
+    if import_folder:
+        latest_file = get_newest_csv_file(import_folder)
+        if latest_file is not None:
+            print(f'Use following file?')
+            print(latest_file)
+            ans = input('y/n: ')
+            if ans == 'y':
+                found_csv = True
+    if not found_csv:
+        root = tk.Tk()
+        root.withdraw()
+        latest_file = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
+        if not latest_file:
+            return None
+
+    mod_df = df.copy()
+
+    with open(latest_file, 'r') as f:
+        id_col = headers.index('id')
+        for line in f:
+            split_line = line.split(csv_sep)
+            if len(split_line) > id_col:
+                id_num = int(split_line[id_col].strip())
+                change_input = ['id='+str(id_num)]
+                for spl,col in zip(split_line,headers):
+                    if col != 'id':
+                        col_found = find_column(col,read_only=False)
+                        if col_found != None:
+                            change_input.extend([col])
+                            change_input.extend([spl.strip()])
+                            mod_df = change_dataframe_handle(change_input,mod_df)
+    return mod_df
+
+def import_data(input_df=None):
     print('')
     print('')
     import_setting = import_settings('import')
@@ -391,7 +436,7 @@ def import_data(input_df=None,new=False):
     else:
         return None
 
-def create_output(df,df_fil,v,output_method=0):
+def create_output(df,df_fil,v,output_method=0,silent=False):
     # Select correct view
     print_col = settings['views'][v["view"]]['columns']
     print_col_align = settings['views'][v["view"]]['columns']
@@ -555,7 +600,7 @@ def create_output(df,df_fil,v,output_method=0):
                 df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
             if page < pages: 
                 df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
-    if len(df_sorted) == 0:
+    if len(df_sorted) == 0 and not silent:
         print('Filter does not return any posts')
         print(df_fil)
         #return df_sorted
@@ -751,11 +796,12 @@ def filter_dataframe(df, df_filter,get_ids=False):
                     filtered_df = filtered_df.loc[filtered_df[column_name] >= float(lower_bound)]
                 if upper_bound is not None:
                     filtered_df = filtered_df.loc[filtered_df[column_name] <= float(upper_bound)]
+    df_unique = filtered_df.drop_duplicates(subset='id', keep='last')
     if not get_ids: 
-        return filtered_df
+        return df_unique
     else:
         #not used
-        return filtered_df['id']
+        return df_unique['id']
 
 def find_column(input_string,read_only=True):
     # Define a dictionary of predefined words with their corresponding 3-letter keys
@@ -764,7 +810,7 @@ def find_column(input_string,read_only=True):
             'id': 'id',
             'tex': 'text',
             'inf': 'info',
-            'use': 'user_notes',
+            'not': 'notes',
             'cat': 'category_id',
             'acc': 'account',
             'dat': 'date',
@@ -803,7 +849,7 @@ def find_column(input_string,read_only=True):
         # If the key is not in the dictionary, return None
         return None
 
-def change_dataframe_rows(df,v , column_to_change, dataframe_ids, new_value):
+def change_dataframe_rows(df, column_to_change, dataframe_ids, new_value):
     """
     Changes one or multiple rows of a dataframe by setting the specified column to a new value.
 
@@ -842,11 +888,11 @@ def auto_change_dataframe(df, df_filt,cur_view, input_ids):
         mod_filt = df_filt.copy()
         for _c,_v in auto_value['search'].items():
             mod_filt = change_filter(mod_filt,_c,_v)
-        filter_ids = create_output(df, mod_filt, cur_view,'all')
+        filter_ids = create_output(df, mod_filt, cur_view,'all',silent=True)
         combined_ids = pd.concat([input_ids, filter_ids],ignore_index=True)
         change_ids = combined_ids[combined_ids.duplicated()]
         for _c,_v in auto_value['change'].items():
-           _value = convert_value_to_data_type(df,cur_view,_c,_v)
+           _value = convert_value_to_data_type(df,_c,_v)
            if _value is not None or _v == 'first':
                if _c == 'category':
                    if _v != '':
@@ -854,15 +900,15 @@ def auto_change_dataframe(df, df_filt,cur_view, input_ids):
                    else:
                        _v = ['','']
                    if _v is not None:
-                       mod_df = change_dataframe_rows(mod_df,cur_view,_c,change_ids,_v[1])
-                       mod_df = change_dataframe_rows(mod_df,cur_view,'category_type',change_ids,_v[0])
+                       mod_df = change_dataframe_rows(mod_df,_c,change_ids,_v[1])
+                       mod_df = change_dataframe_rows(mod_df,'category_type',change_ids,_v[0])
                elif _c == 'marked':
                    if _v != '':
                        _v = autocomplete_marked(_v)[0]
                    if _v is not None:
-                       mod_df = change_dataframe_rows(mod_df,cur_view,_c,change_ids,_v)
+                       mod_df = change_dataframe_rows(mod_df,_c,change_ids,_v)
                else:
-                   mod_df = change_dataframe_rows(mod_df,view,_c,change_ids,_v)
+                   mod_df = change_dataframe_rows(mod_df,_c,change_ids,_v)
         
         #Change all change_ids in mod_df
     return mod_df
@@ -989,7 +1035,7 @@ def convert_string_to_list(string):
 
     return list(set(result))
 
-def convert_value_to_data_type(dfs,v , column, value):
+def convert_value_to_data_type(dfs, column, value):
     """
     Converts a value to the same data type as the values in a specified column of a DataFrame.
 
@@ -1216,7 +1262,8 @@ def change_filter(input_filters, input_column,input_value):
                         cat_value_list = autocomplete_category(ci,output='comp_list')
                         if cat_value_list is not None:
                             for cvl in cat_value_list:
-                                cat_values.append(cvl)
+                                if cvl not in cat_values:
+                                    cat_values.append(cvl)
                 if len(cat_values) > 0:
                     input_filters.setdefault(input_column, {})['equal'] = cat_values
                     input_filters.setdefault(input_column, {})['not_empty'] = True
@@ -1901,16 +1948,19 @@ def show_detail(_input):
         print('Only 1 selection allowed')
     skip_update = True
 
-def change_dataframe_handle(_input,df,df_filt,vi):
+def change_dataframe_handle(_input,df,df_filt={},vi=[]):
     global dataframe_update
     global skip_update
     _column = find_column(_input[1],False)
     if _column is not None:
-        change_ids = create_output(df,df_filt,vi,_input[0])
+        if len(_input[0]) > 3 and _input[0][:3] == 'id=':
+            change_ids = pd.Series([int(_input[0][3:])])
+        else:
+            change_ids = create_output(df,df_filt,vi,_input[0])
         if len(change_ids) > 0:
             _value = _input[2]
             if _value != '':
-                _value = convert_value_to_data_type(df,vi,_column,_input[2])
+                _value = convert_value_to_data_type(df,_column,_input[2])
             if _value is not None:
                 if _column == 'category':
                     if _value != '':
@@ -1919,19 +1969,19 @@ def change_dataframe_handle(_input,df,df_filt,vi):
                         _value = ['','']
                     if _value is not None:
                         dataframe_update = True
-                        df = change_dataframe_rows(df,vi,_column,change_ids,_value[1])
-                        df = change_dataframe_rows(df,vi,'category_type',change_ids,_value[0])
+                        df = change_dataframe_rows(df,_column,change_ids,_value[1])
+                        df = change_dataframe_rows(df,'category_type',change_ids,_value[0])
                     else: skip_update = True
                 elif _column == 'marked':
                     if _value != '':
                         _value = autocomplete_marked(_value)[0]
                     if _value is not None:
                         dataframe_update = True
-                        df = change_dataframe_rows(df,vi,_column,change_ids,_value)
+                        df = change_dataframe_rows(df,_column,change_ids,_value)
                     else: skip_update = True
                 else:
                     dataframe_update = True
-                    df = change_dataframe_rows(df,vi,_column,change_ids,_value)
+                    df = change_dataframe_rows(df,_column,change_ids,_value)
             else: skip_update = True
     else: skip_update = True
     return df
@@ -2022,6 +2072,12 @@ def handle_user_input(user_input,df,df_filt,vi):
         if df is None:
             skip_update = True
             warn_message.append('Import canceled')
+    elif user_input[0] == 'ic':
+        df = import_change_by_id(df)
+        if df is None:
+            skip_update = True
+        else:
+            dataframe_update = True
     # export data
     elif user_input[0] == 'e':
         export_dataframe()
@@ -2076,7 +2132,7 @@ def handle_user_input(user_input,df,df_filt,vi):
             id_sel = user_input[1]
         else:
             id_sel = 'all'
-        change_ids = create_output(df,df_filt,vi,id_sel)
+        change_ids = create_output(df,df_filt,vi,id_sel,silent=True)
         df = auto_change_dataframe(df,df_filt, vi,change_ids)
         dataframe_update = True
     # Calc loans
@@ -2367,7 +2423,7 @@ def substitute_parameters(df,view,loan_parameters):
             column = find_column(re.split(f'[{"".join(split_characters)}]', filt)[0])
             split_character = next(char for char in filt if char in split_characters)
             value = filt.split(split_character)[1].strip()
-            if column in ['text','info','user_notes','category_id','account','category','status','marked','notes']:
+            if column in ['text','info','category_id','account','category','status','marked','notes']:
                 incl_sc = ''
             else:
                 incl_sc = split_character
