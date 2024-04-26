@@ -546,7 +546,8 @@ def create_output(df,df_fil,v,output_method=0,silent=False):
             # Create a list of datetimes with a monthly frequency
             #new_rows = pd.DataFrame({'name': name_values})
             #df_sorted = pd.concat([new_rows, df_sorted], ignore_index=True)
-            df_sorted = pd.concat([df_sorted,new_rows], ignore_index=True)
+            #df_sorted = pd.concat([df_sorted,new_rows], ignore_index=True)
+            df_sorted = pd.concat([new_rows,df_sorted], ignore_index=True)
         _month_col = get_months()
 
     if v["type"] == 'budget status':
@@ -596,10 +597,15 @@ def create_output(df,df_fil,v,output_method=0,silent=False):
             page = pages
         v["page"] = str(page)
         if output_method != 'all':
-            if page > 1:
-                df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
-            if page < pages: 
-                df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
+            if pages > 1:
+                if page < pages:
+                    df_sorted = df_sorted.iloc[0:page * int(settings['view_rows']),:]
+                if page > 1: 
+                    df_sorted = df_sorted.iloc[(page - 1) * int(settings['view_rows']):,:]
+            #if page > 1:
+            #    df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
+            #if page < pages: 
+            #    df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
     if len(df_sorted) == 0 and not silent:
         print('Filter does not return any posts')
         print(df_fil)
@@ -943,7 +949,10 @@ def split_dataframe_rows(df, dataframe_ids, new_value, new_category, new_mark, n
     new_rows['id'] = new_ids
     if new_mark is not None:
         if new_mark != '-':
-            new_rows['marked'] = new_mark
+            if list(new_mark):
+                new_rows['marked'] = new_mark[0]
+            else:
+                new_rows['marked'] = new_mark
     else:
         new_rows['marked'] = ''
     if new_category != '-':
@@ -953,7 +962,11 @@ def split_dataframe_rows(df, dataframe_ids, new_value, new_category, new_mark, n
         else:
             new_rows['category_type'] = new_category[0]
             new_rows['category'] = new_category[1]
-    new_rows['notes'] = new_note
+    if new_note is None:
+        #new_rows['notes'] = df.loc[df['id'].isin(ids_to_split), 'notes'].str.cat(sep=' ')
+        new_rows['notes'] = df.loc[df['id'].isin(ids_to_split), 'notes']
+    else:
+        new_rows['notes'] = new_note
     dt = pd.to_datetime(datetime.now())
     new_rows['changed'] = dt
     new_rows['value'] = 0
@@ -1122,6 +1135,7 @@ def autocomplete_category( string_bit, output='default'):
                                 count += 1
                                 result.append(str(cat) + sub)
         # Check for matches in category names and subcategory names
+        cats = []
         if not string_bit.isdigit():
             for category, subcategories in settings['categories'].items():
                 for subcategory, name in subcategories.items():
@@ -1132,12 +1146,14 @@ def autocomplete_category( string_bit, output='default'):
                                 result.append(str(category) + subcategory)
                             elif output2 == 'default':
                                 result = [category, subcategory]
+                            cats.append(result)
                         else:
                             if output2 == 'list':
                                 for subcategory, name in subcategories.items():
                                     if subcategory != 'name' and subcategory != 'type':
                                         count += 1
                                         result.append(str(category) + subcategory)
+                                        cats.append(result[-1])
         if count == 0:
             print('No category match found for ' + string_bit)
         elif count == 1:
@@ -1155,6 +1171,11 @@ def autocomplete_category( string_bit, output='default'):
             return result1,result2
         else:
             print(f'{count} matches found for {string_bit}')
+            try:
+                for cat in cats:
+                    print(f'    {settings["categories"][cat[0]]["name"]} - {settings["categories"][cat[0]][cat[1]]}')
+            except:
+                pass
         for category, subcategories in settings['categories'].items():
             for subcategory, name in subcategories.items():
                 if string_bit.lower() in name.lower():
@@ -2042,7 +2063,7 @@ def split_dataframe_handle(_input,df,df_filt,vi):
                         print('Enter new note')
                         new_note = input('')
                 else:
-                    new_note = ''
+                    new_note = None
                 dataframe_update = True
                 df = split_dataframe_rows(df, change_ids, new_value, new_cat, new_mark, new_note)
             else: skip_update = True
