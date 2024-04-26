@@ -3,8 +3,8 @@ views[0] = {"key": "bal", "name":"Balance", "type": "posts",
             "align": ["c","c","l","r","r","c","l","l"]
            }
 filters[0] = {"key": "bal", "type": "posts",
-             "sort": {"column": "imported", "direction": "des"},
-             "sort2": {"column": "", "direction": ""},
+             "sort": {"column": "imported", "direction": "asc"},
+             "sort2": {"column": "", "direction": "des"},
              "posted_date": {"min": "-1year2month"},
              "split_id": {"max":-1}
             }
@@ -13,16 +13,16 @@ views[1] = {"key": "cat","name":"Categories", "type": "posts",
             "align": ["c","c","l","l","r","l","c"]
            }
 filters[1] = {"key": "cat", "type": "posts",
-             "sort": {"column": "date", "direction": "des"},
-             "sort2": {"column": "id", "direction": "des"},
+             "sort": {"column": "date", "direction": "asc"},
+             "sort2": {"column": "id", "direction": "asc"},
             }
 views[2] = {"key": "ste","name":"Stephanie", "type": "posts",
             "columns": ["id","date","text","category","amount","notes","status"],
             "align": ["c","c","l","l","r","l","c"]
            }
 filters[2] = {"key": "ste", "type": "posts",
-             "sort": {"column": "status", "direction": "asc"},
-             "sort2": {"column": "date", "direction": "des"},
+             "sort": {"column": "status", "direction": "des"},
+             "sort2": {"column": "date", "direction": "asc"},
              "marked": {"equal": ["Stephanie"]}
             }
 views[3] = {"key": "jak","name":"Jakob", "type": "posts",
@@ -30,8 +30,8 @@ views[3] = {"key": "jak","name":"Jakob", "type": "posts",
             "align": ["c","c","l","l","r","c"]
            }
 filters[3] = {"key": "jak", "type": "posts",
-             "sort": {"column": "status", "direction": "asc"},
-             "sort2": {"column": "date", "direction": "des"},
+             "sort": {"column": "status", "direction": "des"},
+             "sort2": {"column": "date", "direction": "asc"},
              "marked": {"equal": ["Jakob"]}
             }
 views[4] = {"key": "bor","name":"Born", "type": "posts",
@@ -39,8 +39,8 @@ views[4] = {"key": "bor","name":"Born", "type": "posts",
             "align": ["c","c","l","l","r","c"]
            }
 filters[4] = {"key": "bor", "type": "posts",
-             "sort": {"column": "status", "direction": "asc"},
-             "sort2": {"column": "date", "direction": "des"},
+             "sort": {"column": "status", "direction": "des"},
+             "sort2": {"column": "date", "direction": "asc"},
              "marked": {"equal": ["Børn"]}
             }
 views[5] = {"key": "bud", "type": "budget", "name":"Budget {year} details", "group": None,
@@ -48,31 +48,31 @@ views[5] = {"key": "bud", "type": "budget", "name":"Budget {year} details", "gro
             "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r","r"]
            }
 filters[5] = {"key": "bud", "type": "budget",
-             "sort": {"column": "id", "direction": "asc"},
-             "sort2": {"column": "category", "direction": ""}
+             "sort": {"column": "id", "direction": "des"},
+             "sort2": {"column": "category", "direction": "asc"}
              }
 views[6] = {"key": "buo", "type": "budget", "name":"Budget {year} overview", "group": "category",
             "columns": ["name","category","jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec","tot"],
             "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r","r"]
            }
 filters[6] = {"key": "buo", "type": "budget",
-             "sort": {"column": "id", "direction": "asc"},
-             "sort2": {"column": "category", "direction": ""}
+             "sort": {"column": "id", "direction": "des"},
+             "sort2": {"column": "category", "direction": "asc"}
              }
 views[7] = {"key": "bus", "type": "budget status", "name":"Budget {year} status", "group": "category",
             "columns": ["name","category","jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec","tot"],
             "align": ["l","l","r","r","r","r","r","r","r","r","r","r","r","r","r"]
            }
 filters[7] = {"key": "bus", "type": "budget status",
-             "sort": {"column": "id", "direction": "asc"},
-             "sort2": {"column": "category", "direction": ""}
+             "sort": {"column": "id", "direction": "des"},
+             "sort2": {"column": "category", "direction": "asc"}
              }
 views[8] = {"key": "new","name":"Categories", "type": "posts",
             "columns": ["id","date","text","category","amount","marked","status"],
             "align": ["c","c","l","l","r","l","c"]
            }
 filters[8] = {"key": "new", "type": "posts",
-             "sort": {"column": "date", "direction": "des"},
-             "sort2": {"column": "id", "direction": "des"},
+             "sort": {"column": "date", "direction": "asc"},
+             "sort2": {"column": "id", "direction": "asc"},
              "imported": {"min": "-2day"}
             }
