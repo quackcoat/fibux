@@ -19,6 +19,50 @@ import readline
 import traceback
 import shlex
 
+# To fix
+# details in budget is wrong after changing page views.
+def create_pages(df,v,sel=None):
+    pages = m.ceil(len(df)/int(settings["view_rows"]))
+    total_length = len(df)
+    # Dataframe to show
+    page = int(v["page"]) 
+    if page < 1:
+        page = 1
+    if page > pages:
+        page = pages
+    v["page"] = str(page)
+    v["pages"] = str(pages)
+    if pages > 1:
+        if page < pages:
+            df = df.iloc[0:page * int(settings['view_rows']),:]
+        if page > 1: 
+            df = df.iloc[(page - 1) * int(settings['view_rows']):,:]
+    if sel is not None:
+        return df.iloc[int(sel)-1,:],v
+    else:
+        return df,v
+
+def create_table(df_in,v,col,ali=[],header='',output=print):
+    df = df_print_format(df_in)
+    max_col = v['max_col_width']
+    table = pt(col)
+    table._max_width = {c: max_col for c in col}
+    for c, a in zip(col, ali):
+        table.align[c] = a
+    for index,row in df[col].iterrows():
+        if not v['show_multiple_lines']:
+            for column in col:
+                if isinstance(row[column],str):
+                    if len(row[column]) > max_col:
+                        row[column] = row[column][:max_col-3] + '...'
+        table.add_row(row)
+    if output == 'print':
+        print('')
+        tprint(header,font="aquaplan")
+        print(table)
+    elif output == 'table':
+        return table
+
 def convert_to_bool(i):
     if isinstance(i,str):
         if i.lower() == 'true':
@@ -130,29 +174,6 @@ def import_settings(_type):
                     parameters[key] = value
         if len(parameters):
             loans.append(parameters)
-
-        '''
-            if len(parameters):
-                if len(loan_name)
-
-        loans_details = re.split(r'name:', content)[1:]  # Split content into individual loans
-        loans = []
-
-        for loan in loans_details:
-            parameters = {}
-            lines = loan.strip().split('\n')
-            parameters['name'] = lines[0].strip().split(';')[0]
-            parameters['filter'] = lines[0].strip().split(';')[1:]
-            
-            for line in lines[1:]:
-                if len(line) and line.strip()[0] != '#':
-                    print(line)
-                    key = re.split(':|=',line,1)[0].strip()
-                    value = re.split(':|=',line,1)[1].strip()
-                    parameters[key] = value
-
-            loans.append(parameters)
-        '''
         return loans
     elif _type == 'import' and False:
         # Convert the string representation to a dictionary using ast.literal_eval
@@ -252,6 +273,7 @@ def add_missing_columns(data):
         # insert the datetime object into the 'timestamp' column of the dataframe
         data.at[index, 'imported'] = dt
         data.at[index, 'changed'] = dt
+        cur_df = check_and_correct_df(cur_df)
     data[add_col[1:]] = data[add_col[1:]].fillna('')
     return data
 
@@ -435,6 +457,22 @@ def import_data(input_df=None):
         return df
     else:
         return None
+def df_print_format(df):
+    #try:
+    float_format = lambda x: f"{x:,.2f}"
+    for c in ['amount','value','balance']:
+        if c in df.columns:
+            df[c] = df[c].apply(float_format)
+    float_format = lambda x: f"{x:,.0f}"
+    for c in ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','tot']:
+        if c in df.columns:
+            df[c] = df[c].apply(float_format)
+    for c in ['posted_date','date','imported','changed']:
+        if c in df:
+            df[c] = df[c].dt.strftime(settings['date_format_print'])
+    #except:
+    #    pass
+    return df
 
 def create_output(df,df_fil,v,output_method=0,silent=False):
     # Select correct view
@@ -507,6 +545,7 @@ def create_output(df,df_fil,v,output_method=0,silent=False):
             mar_list = autocomplete_marked()
             #mar_dic = {index: value for index, value in enumerate(mar_list)}
             mar_dic = {key: {} for key in mar_list}
+            new_id = 0
             for _m,_item in settings['marked'].items():
                 for start,end,value in zip(_item['start'],_item['end'],_item['value']):
                     start_date = pd.to_datetime(start, format='%Y-%m')
@@ -534,6 +573,8 @@ def create_output(df,df_fil,v,output_method=0,silent=False):
                 post_filtered = filter_dataframe(post_df, marked_filter)
                 past_years_used = post_filtered['amount'].sum()
                 mar_dic[_m]['jan'] -= past_years_used
+                new_id -= 1
+                mar_dic[_m]['id'] = new_id
             #new_rows = pd.DataFrame.from_dict({(i, 'name'): j for i, j in mar_dic.items()}, orient='index')
             # Convert the dictionary to a DataFrame
             new_rows = pd.DataFrame.from_dict(mar_dic, orient='index')
@@ -587,34 +628,17 @@ def create_output(df,df_fil,v,output_method=0,silent=False):
         df_total.loc[0] = numeric_columns.sum()
         df_total.fillna('', inplace=True)
     if output_method != 'df' and output_method != 'table':
-        pages = m.ceil(len(df_sorted)/int(settings["view_rows"]))
-        total_length = len(df_sorted)
-        # Dataframe to show
-        page = int(v["page"]) 
-        if page < 1:
-            page = 1
-        if page > pages:
-            page = pages
-        v["page"] = str(page)
         if output_method != 'all':
-            if pages > 1:
-                if page < pages:
-                    df_sorted = df_sorted.iloc[0:page * int(settings['view_rows']),:]
-                if page > 1: 
-                    df_sorted = df_sorted.iloc[(page - 1) * int(settings['view_rows']):,:]
-            #if page > 1:
-            #    df_sorted = df_sorted.iloc[:(1-page)*int(settings["view_rows"]),:].copy()
-            #if page < pages: 
-            #    df_sorted = df_sorted.iloc[(pages - page - 1) * int(settings['view_rows']) + (total_length % int(settings["view_rows"])):,:]
+             df_sorted,v = create_pages(df_sorted,v)
     if len(df_sorted) == 0 and not silent:
         print('Filter does not return any posts')
         print(df_fil)
         #return df_sorted
     
     if output_method == 0 or output_method == 'df' or output_method == 'table':
-        for date_column in ['posted_date','date','imported','changed']:
-            if date_column in df_sorted and date_column in print_col:
-                df_sorted[date_column] = df_sorted[date_column].dt.strftime('%d %b %Y')
+        #for date_column in ['posted_date','date','imported','changed']:
+        #    if date_column in df_sorted and date_column in print_col:
+        #        df_sorted[date_column] = df_sorted[date_column].dt.strftime('%d %b %Y')
         # Changing category column to name.
         
         if 'category' in settings['views'][v['view']]['columns']:
@@ -651,49 +675,39 @@ def create_output(df,df_fil,v,output_method=0,silent=False):
                     #_text = category_name + ' - ' + sub_category_name
                     df_sorted.at[index, 'category'] = _text.strip()
                     # Select only numeric columns for summing
-        if len(df_sorted) > 0 and (output_method == 0 or output_method == 'table'):
-            float_format = lambda x: f"{x:,.2f}"
-            for c in ['amount','value','balance']:
-                if c in df_sorted.columns:
-                    df_sorted[c] = df_sorted[c].apply(float_format)
-            float_format = lambda x: f"{x:,.0f}"
-            for c in ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','tot']:
-                if c in df_sorted.columns:
-                    df_sorted[c] = df_sorted[c].apply(float_format)
-                if 'budget' in v['type']:
-                    if c in df_total.columns:
-                        df_total[c] = df_total[c].apply(float_format)
-        max_col = v['max_col_width']
+        #if len(df_sorted) > 0 and (output_method == 0 or output_method == 'table'):
+            #df_sorted = df_print_format(df_sorted)
+            #if 'budget' in v['type']:
+            #    df_total = df_print_format(df_total)
+            #  
+            #float_format = lambda x: f"{x:,.2f}"
+            #for c in ['amount','value','balance']:
+            #    if c in df_sorted.columns:
+            #        df_sorted[c] = df_sorted[c].apply(float_format)
+            #float_format = lambda x: f"{x:,.0f}"
+            #for c in ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec','tot']:
+            #    if c in df_sorted.columns:
+            #        df_sorted[c] = df_sorted[c].apply(float_format)
+            #    if 'budget' in v['type']:
+            #        if c in df_total.columns:
+            #            df_total[c] = df_total[c].apply(float_format)
         if output_method == 'df':
             return df_sorted
         if output_method != 'table':
             df_sorted.loc[:,'select'] = range(1,len(df_sorted) + 1)
             print_col = list(['select'] + print_col)
+            align_col = list(['c'] + align_col)
             if 'budget' in v['type']:
                 df_total.loc[0,'select'] = ''
-        table = pt(print_col)
-        table._max_width = {col: max_col for col in print_col}
-        for col, align in zip(print_col_align, align_col):
-            table.align[col] = align
-        for index,row in df_sorted[print_col].iterrows():
-            if not v['show_multiple_lines']:
-                for column in print_col:
-                    if isinstance(row[column],str):
-                        if len(row[column]) > max_col:
-                            row[column] = row[column][:max_col-3] + '...'
-            table.add_row(row)
         if 'budget' in v['type']:
-            for index,row in df_total[print_col].iterrows():
-                table.add_row(row)
+            df_sorted = pd.concat([df_sorted, df_total], ignore_index=True)
         if output_method == 0:
-            print('')
             print_header = settings['views'][v['view']]['name'].format(year=v['year'])
-            tprint(print_header,font="aquaplan")
-            print(table)
-            print("Page " + str(page) + " of " + str(pages))
+            create_table(df_sorted,v,header=print_header,col=print_col,ali=align_col,output='print')
+            print("Page " + v['page'] + " of " + v['pages'])
             return v
         elif output_method == 'table':
-            return table
+            return create_table(df_sorted,v,col=print_col,ali=align_col,output='table')
     else:
         if v['type'] == 'posts':
             # Get and return row number
@@ -1173,14 +1187,13 @@ def autocomplete_category( string_bit, output='default'):
             print(f'{count} matches found for {string_bit}')
             try:
                 for cat in cats:
-                    print(f'    {settings["categories"][cat[0]]["name"]} - {settings["categories"][cat[0]][cat[1]]}')
+                    print(f'  {str(cat[0])}{cat[1]}: {settings["categories"][cat[0]]["name"]} - {settings["categories"][cat[0]][cat[1]]}')
             except:
                 pass
         for category, subcategories in settings['categories'].items():
             for subcategory, name in subcategories.items():
                 if string_bit.lower() in name.lower():
                     A = 1
-                    #print(f'{category}{subcategory} {category['name'}} {subcategory[
         
         # Return None if no match is found
     return None
@@ -1586,12 +1599,7 @@ def budget_status(df,post_df,v,output_method=0):
     if isinstance(output_method,list):
         output_method_num = output_method[0]
         output_method_mon = get_months(output_method[1])
-        pages = m.ceil(len(df)/int(settings["view_rows"]))
-        total_length = len(df)
-        page = int(v["page"]) 
-        #rev_loc = int(output_method_num) + (page-1)*(pages)
-        get_index = len(df) - int(output_method_num) + (page-1)*(pages)
-        
+        df_temp,v = create_pages(df,v,sel=output_method_num)
     filters_ini = {"key": "", "type": "posts"}
     # Loop over each row in the DataFrame and update budget values
     _month_col = get_months()
@@ -1619,7 +1627,7 @@ def budget_status(df,post_df,v,output_method=0):
             filter_post_df = filter_dataframe(post_df, filt)
             if isinstance(output_method,list):
                 if month in output_method_mon:
-                    if index == get_index:
+                    if row['id'] == df_temp['id']:
                         print(f'Month {month}, {len(filter_post_df)} posts')
                         if len(filter_post_df):
                             print(filter_post_df[['date','text','amount','category_type','category']])
@@ -1936,37 +1944,38 @@ def show_detail(_input):
         change_ids = create_output(cur_df,df_filters,view,_input[0])
         print(len(change_ids))
         if len(change_ids) == 1:
+            print_df = cur_df.loc[cur_df['id'].isin(change_ids)]
             print()
             print('***Imported/fixed data columns')
-            print(f'id: ' + str(cur_df.loc[change_ids,'id'].values[0]))
-            print(f'posted_date: ' + str(cur_df.loc[change_ids,'posted_date'].dt.strftime('%d %b %Y').values[0]))
-            print(f'text: ' + cur_df.loc[change_ids,'text'].values[0])
-            print(f'value: ' + str(cur_df.loc[change_ids,'value'].values[0]))
-            print(f'balance: ' + str(cur_df.loc[change_ids,'balance'].values[0]))
-            print(f'account: ' + cur_df.loc[change_ids,'account'].values[0])
-            print(f'info: ' + cur_df.loc[change_ids,'info'].values[0])
-            print(f'imported: ' + str(cur_df.loc[change_ids,'imported'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
+            print(f'id: ' + str(print_df['id'].values[0]))
+            print(f'posted_date: ' + str(print_df['posted_date'].dt.strftime(settings['date_format_print']).values[0]))
+            print(f'text: ' + print_df['text'].values[0])
+            print(f'value: ' + str(print_df['value'].values[0]))
+            print(f'balance: ' + str(print_df['balance'].values[0]))
+            print(f'account: ' + print_df['account'].values[0])
+            print(f'info: ' + print_df['info'].values[0])
+            print(f'imported: ' + str(print_df['imported'].dt.strftime(settings['date_format_print'] + ' %H:%M:%S').values[0]))
             print('***Category/changable data')
-            print(f'date: ' + str(cur_df.loc[change_ids,'date'].dt.strftime('%d %b %Y').values[0]))
-            cat_typ = cur_df.loc[change_ids,'category_type'].values[0]
-            cat = cur_df.loc[change_ids,'category'].values[0]
+            print(f'date: ' + str(print_df['date'].dt.strftime(settings['date_format_print']).values[0]))
+            cat_typ = print_df['category_type'].values[0]
+            cat = print_df['category'].values[0]
             print(f'category_type: ' + str(cat_typ))
             print(f'category: ' + cat)
             if cat_typ != '':
                 category_name = settings['categories'][cat_typ]['name']
                 sub_category_name = settings['categories'][cat_typ][cat]
                 print(f'Category display name: {category_name} - {sub_category_name}')
-            print(f'amount: ' + str(cur_df.loc[change_ids,'amount'].values[0]))
-            print(f'split_id: ' + str(cur_df.loc[change_ids,'split_id'].values[0]))
-            print(f'marked: ' + cur_df.loc[change_ids,'marked'].values[0])
-            print(f'notes: ' + cur_df.loc[change_ids,'notes'].values[0])
-            print(f'status: ' + cur_df.loc[change_ids,'status'].values[0])
-            print(f'changed: ' + str(cur_df.loc[change_ids,'changed'].dt.strftime('%d %b %Y %H:%M:%S').values[0]))
+            print(f'amount: ' + str(print_df['amount'].values[0]))
+            print(f'split_id: ' + str(print_df['split_id'].values[0]))
+            print(f'marked: ' + print_df['marked'].values[0])
+            print(f'notes: ' + print_df['notes'].values[0])
+            print(f'status: ' + print_df['status'].values[0])
+            print(f'changed: ' + str(print_df['changed'].dt.strftime(settings['date_format_print'] + ' %H:%M:%S').values[0]))
+        else:
+            print('Only 1 selection allowed')
     elif view['type'] == 'budget status':
         change_ids = create_output(cur_df,df_filters,view,_input)
         #skip_update = True
-    else:
-        print('Only 1 selection allowed')
     skip_update = True
 
 def change_dataframe_handle(_input,df,df_filt={},vi=[]):
@@ -2141,6 +2150,14 @@ def handle_user_input(user_input,df,df_filt,vi):
            print_help('detail',view)
        else:
            show_detail(user_input[1:])
+    elif user_input[0] == 'ovs':
+        df_filtered = filter_dataframe(df, df_filt)
+        overview(df_filtered, mode='simple')
+        skip_update = True
+    elif user_input[0] == 'ovm':
+        df_filtered = filter_dataframe(df, df_filt)
+        overview(df_filtered, mode='months')
+        skip_update = True
     # Change dataframe
     elif user_input[0] == 'c':
         if len(user_input) == 1:
@@ -2192,6 +2209,11 @@ def check_and_correct_df(df):
         else:
             print(f"'{col}' column has an unexpected data type:", df[col].dtype)
 
+    # Convert columns to datetime if they are not already
+    date_columns = ['posted_date', 'date', 'changed', 'imported']
+    for col in date_columns:
+        if df[col].dtype != 'datetime64[ns]':
+            df[col] = pd.to_datetime(df[col])
     # Check for rows where 'value' is 0 and 'split_id' is not -1
     zero_value_minus_one_rows = df[(df['value'] == 0) & (df['split_id'] == -1)]
     
@@ -2590,6 +2612,71 @@ def set_default_parameters(substituted_parameters):
         substituted_parameters['yearly_payments'] = 12
     return substituted_parameters
 
+def overview(df, mode='simple'):
+    if mode == 'simple':
+        # Sort dataframe by 'amount'
+        df_sorted = df.sort_values(by='amount')
+
+        # Create PrettyTable with required columns
+        tab = pt(['Date', 'Text', 'Amount'])
+
+        # Add smallest 5 rows
+        df_small = df_sorted.head(5).copy()
+        df_small = df_print_format(df_small)
+        for _, row in df_small.iterrows():
+            tab.add_row([row['date'], row['text'], row['amount']])
+        for col, align in zip(tab.field_names,["c","l","r"]):
+            tab.align[col] = align
+        print('Smallest posts')
+        print(tab)
+        print()
+        tab = pt(['Date', 'Text', 'Amount'])
+        df_large = df_sorted.tail(5).copy()
+        df_large = df_print_format(df_large)
+        for _, row in df_large.iterrows():
+            tab.add_row([row['date'], row['text'], row['amount']])
+        for col, align in zip(tab.field_names,["c","l","r"]):
+            tab.align[col] = align
+
+        print('Largest posts')
+        print(tab)
+        print()
+        tab = pt(['Statistic', 'Value'])
+        # Calculate average amount size and sum
+        tab.add_row(['Average',"{:.2f}".format(df['amount'].mean())])
+        tab.add_row(['Sum',"{:.2f}".format(df['amount'].sum())])
+        for col, align in zip(tab.field_names,["l","r"]):
+            tab.align[col] = align
+        print(tab)
+
+        # Add summary rows
+        #print(f'Average: {"{:.2f}".format(avg_amount)}')
+        #print(f'Sum:     {"{:.2f}".format(total_amount)}')
+        
+
+    elif mode == 'months':
+        # Calculate sum for last 12 months plus the current month
+        today = datetime.today()
+        end_date = today.replace(day=1)
+        start_date = (end_date - timedelta(days=365)).replace(day=1)
+
+        # Filter dataframe for the last 12 months plus the current month
+        df_filtered = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+
+        # Group by month and calculate sum of amount
+        monthly_sum = df_filtered.groupby(df_filtered['date'].dt.strftime('%Y-%m'))['amount'].sum()
+
+        # Create PrettyTable with required columns
+        tab = pt(['Month', 'Sum'])
+
+        # Add rows for each month
+        for index, value in monthly_sum.items():
+            tab.add_row([datetime.strptime(index, '%Y-%m').strftime('%b %Y'),"{:,.2f}".format(value)])
+        print(tab)
+
+    else:
+        raise ValueError("Invalid mode. Choose either 'simple' or 'months'.")
+
 def print_help(commands,view):
     global skip_update
     skip_update = True
@@ -2777,6 +2864,7 @@ if __name__ == '__main__':
         if os.path.exists(pickle_file_path):
             print(f'Loading dataframe from {os.path.abspath(pickle_file_path)}')
             cur_df = pd.read_pickle(pickle_file_path)
+            cur_df = check_and_correct_df(cur_df)
             view = create_output(cur_df,df_filters,view)
             print(f'Loaded dataframe from {os.path.abspath(pickle_file_path)}')
             dfs_history.append(cur_df.copy())
