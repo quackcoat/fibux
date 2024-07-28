@@ -1,7 +1,11 @@
+*Category_types
+# Define used name of income and ignore category used in categories
+income;Indkomst
+ignore;ignore
 *Categories
 # Number for category name. letter for sub category name
 #Indkomst;indkomst
-1;Indkomst;indkomst
+1;Indkomst;Indkomst
 a;Anden indkomst
 b;Børnepenge
 c;Dagpenge
@@ -11,20 +15,20 @@ f;Overskydende skat
 g;Renteindtægter
 h;SU & studielån
 #Husholdning;forbrug
-2;Husholdning;forbrug
+2;Husholdning;Forbrug
 a;Apotek
 b;Dagligvarer
 c;Kantine
 d;Kiosk, bager & specialbutikker
 #Bolig;regninger
-3;Bolig;regninger
+3;Bolig;Regninger
 a;Andre boligudgifter
 b;Boliglån & husleje
 c;El, vand & varme
-d;Indbo- & familieforsikring
+d;Hus, indbo- & familieforsikring
 e;Vedligeholdelse
 #Transport;regninger
-4;Transport;regninger
+4;Transport;Regninger
 a;Anden transport
 b;Bilforsikring
 c;Bilkøb & lån
@@ -35,7 +39,7 @@ g;Kørselsordning
 h;Parkering
 i;Værksted & reservedele
 #Øvrige faste;regninger
-5;Øvrige faste;regninger
+5;Øvrige faste;Regninger
 a;Briller & kontaktlinser
 b;Fagforening & A-kasse
 c;Institutioner
@@ -45,7 +49,7 @@ f;Sundheds- & sygeforsikring
 g;Telefoni & internet
 h;TV & streamingstjenester
 #Privatforbrug;forbrug
-6;Privatforbrug;forbrug
+6;Privatforbrug;Forbrug
 a;Andet
 b;Babyudstyr
 c;Bar, café & restaurant
@@ -66,7 +70,7 @@ q;Sport & fritid
 r;Tobak & alkohol
 s;Tøj & sko
 #Ferie;forbrug
-7;Ferie;forbrug
+7;Ferie;Forbrug
 a;Billeje
 b;Transport
 c;Ferieaktiviteter
@@ -76,18 +80,18 @@ f;Mad
 g;Rejseforsikring
 h;Shopping
 #Diverse;regninger
-8;Diverse;regninger
+8;Diverse;Regninger
 a;Bankgebyr
 b;Behandling & læger
 c;Bøder & afgifter
 d;Restskat
 #Lån;regninger
-9;Lån;regninger
+9;Lån;Regninger
 a;Forbrugslån
 b;Privatlån
 c;Studielån
 #Opsparing;opsparing
-10;Opsparing;opsparing
+10;Opsparing;Opsparing
 a;Børneopsparing
 b;Opsparingskonto
 c;Pension
@@ -98,9 +102,9 @@ a;Ignorer
 b;Kontooverførsel
 c;Udlæg
 *Auto category
-# columns to change = category,marked,date. columns to filter for = text,amount,notes. Use comma to search for multiple values.
-marked=jakob;info=XXXX 1056,XXXX1056,XXXX 9890,XXXX9890
-marked=stephanie;info=XXXX 1130,XXXX1130,XXXX 9700,XXXX9700
+# columns to change = category,marked,date. columns to filter for = text,amount,notes,info. Use comma to search for multiple values.
+marked=john;info=XXXX 8155,XXXX8155
+marked=jane;info=XXXX 7045,XXXX7045
 #indkomst
 category=anden indkomst;text=boligbonus
 category=overskydende skat;text=overskydende skat
@@ -112,23 +116,24 @@ category=rente;text=rente;value>0
 cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,superlavpris,lidl,aldi,coop,føtex,normal,bilka,foetex,løvbjerg,kvickly,kaffeagent,meny,pant app
 cat=apotek;marked=;text=apotek,med24,apopro
 cat=kantine;text=kba gød,cheval
-cat=kiosk;text=7-eleven,bager
+cat=kiosk;text=7-eleven,bager,lagkagehuset
 #Bolig
 category=boliglån;marked=;date=first;text=totalkredit
 category=andre bolig;text=herning kommune;value>-1800
 category=andre bolig;text=aarhus bolig,A. Christensen,lundmølle
-category=indbo;info=indboforsikring;text=tryg
+category=indbo;info=indboforsikring,husforsikring;text=tryg
 category=varme;text=verdo,vand
 category=vedligehold;text=jem & fix,jem&fix,harald,billigblomst,bauhaus
 #Transport
 category=brændstof;marked=;text=q8,ingo,circle,f24, ok
 category=ejerafgift;marked=;text=skattestyrelsen motor
-category=parkering;marked=;text=easypark,parkering
+category=parkering;marked=;text=easypark,parkering,p-hus,parkzone
 category=bilkøb;text=al finans
-category=anden transport;marked=;text=wash world
+category=anden transport;marked=;text=wash world,brobizz,dot app
 category=bilforsikring;info=motorkøretøj;text=tryg
 #Ovrige faste
-category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,norlys digital,turgame
+category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,norlys digital,turgame,youtube,max.com
+category=streaming;marked=;info=youtubepremium
 category=streaming;text=mobilepay claus hors;value=440
 category=telefoni;marked=;text=call me,cbb
 category=kontaktlinse;text=kontaktlinse
@@ -138,23 +143,26 @@ category=fagforening;text=a-kasse,dbio,danske bioanalytiker,ida,lønsikring
 category=institution;marked=;text=lundgaardskolen
 category=institution;marked=;text=herning kommune;value<-1800
 #Privatforbrug
-#frisør
 category=andet;text=gls
-category=fastfood;text=pizza,just-eat,burger,restaurant
+category=fastfood;text=pizza,just-eat,just eat,burger,restaurant,starbuck,wolt,mcd
+category=forlystelse;text=svømmehal,svømmecenter
 category=frisør;marked=;text=frisør,katja ø
-category=biograf;text=nfb
+category=biograf;text=nfb,biograf
 category=elektronik;text=power,elgiganten,proshop,av-cables,batteri
+category=gambling;text=danskespil,poker
 category=møbler;text=biltema,jysk,basic & more,ikea, SG,bucketbloom
 category=gaver;text=br herning
-category=software;text=google play,apple.com,apps
-category=software;marked=;text=google play;value=-34
+category=software;text=google play,apple.com,apps,forretning: google
+category=software;marked=;text=google;value=-34
 category=software;marked=;text=mambeno
 category=hobby;marked=;text=gør det se,bonnier
 category=hobby;text=BOG-IDE,hobbii,garnshoppen,panduro,yarn,butiksmusak
 category=legetøj;text=børnenes kartel
 category=Sport & fritid;text=gry dans,tjoerringif
-category=tøj & sko;text=h&m,snt,boozt,reshopper,klarna,babysam,viabill,stroempe,nanna xl,coolsko,minijacobi,zizzi,bylindgren
+category=tøj & sko;text=h&m,snt,boozt,reshopper,klarna,babysam,viabill,stroempe,nanna xl,coolsko,minijacobi,zizzi,bylindgren,zalando,sketchers,blinkesko,sketchers,titteboo
 #category=ulykke;info=børneforsikring,ulykkeforsikring;text=q8,ingo,circle,f24
+#Diverse
+category=bankgebyr;marked=;text=hævekortgebyr
 #Gaeld
 category=9c;text=studiegæld
 #Opsparing

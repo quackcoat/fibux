@@ -1,9 +1,9 @@
 csv_encoding=latin-1
 text_encoding=utf-8
 text_decoding=latin-1
-headers=[id,ignore,ignore,ignore,ignore,notes]
+headers=[id,ignore,ignore,ignore,ignore,ignore,notes]
 csv_sep=|
 decimal_sep=.
 thousand_sep=,
 date_format=%d-%m-%Y
-import_folder=/home/jakob/Downloads
+import_folder=./

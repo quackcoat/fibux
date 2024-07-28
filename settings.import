@@ -6,4 +6,4 @@ csv_sep=;
 decimal_sep=,
 thousand_sep=.
 date_format=%d-%m-%Y
-import_folder=/home/jakob/Downloads
+import_folder=./

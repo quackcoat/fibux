@@ -1,0 +1,12 @@
+plots[0] = {"key": "plso", "name":"Sankey plot(monthly average) of past 12 months", "type": "sankey",
+            "filter_commands": ["date =rl12fmon"],
+            "options": {"monthly":True}
+           }
+plots[1] = {"key": "plsy", "name":"Sankey plot(monthly average) of current year", "type": "sankey",
+            "filter_commands": ["date =rcyfmon"],
+            "options": {"monthly":True}
+           }
+plots[2] = {"key": "ploo", "name":"Overview plot of past 12 months", "type": "overview",
+            "filter_commands": ["date =rl12fmon"],
+            "options": {"monthly":True}
+           }

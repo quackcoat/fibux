@@ -1,12 +1,12 @@
-output:stephanie_budget_data.txt,jakobandreasen1986@gmail.com,smily2003@hotmail.com
-par0:budget;key=bus;name=Stephanie;value=current_month_sum
-par1:posts;key=ste;filter=sta ok;value=amount.sum
-par2:posts;key=ste;value=amount.sum
-text:Stephanie budget status
-text:Stephanie status ekskl. nye poster: {par0 + par1 - par2} kr
-text:Stephanie status inkl. nye poster: {par0} kr
-par3:budget;key=bus;name=Børn;value=current_month_sum
-text:Børn status: {par3} kr
+output:jane_budget_data.txt,yourmail1@gmail.com,yourmail2@gmail.com
+par0:budget;key=bus;name=Jane;value=current_month_sum
+par1:posts;key=jan;filter=jan ok;value=amount.sum
+par2:posts;key=jan;value=amount.sum
+text:Jane budget status
+text:Jane status ekskl. nye poster: {par0 + par1 - par2} kr
+text:Jane status inkl. nye poster: {par0} kr
+par3:budget;key=bus;name=Child;value=current_month_sum
+text:Child status: {par3} kr
 par4:budget;key=bus;name=Husholdning;value=current_month
 text:Husholdning budget: {par4} kr
 par5:budget;key=bus;name=Diverse;value=current_month
