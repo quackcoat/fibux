@@ -14,11 +14,8 @@ import shlex
 from collections import defaultdict
 import math as m
 from datetime import datetime,timedelta
-from art import *
-from pynput.keyboard import Key, Listener
-from dateutil.relativedelta import relativedelta
 
-required_modules = ['numpy', 'pandas', 'matplotlib', 'prettytable','tkinter','plotly']
+required_modules = ['numpy', 'pandas', 'matplotlib', 'prettytable','tkinter','plotly','art','pynput','dateutil']
 def check_modules(modules):
     missing_modules = []
     for module in modules:
@@ -37,7 +34,12 @@ def is_module_installed(module_name):
 def install_modules(modules):
     """Install a list of modules using the preferred pip command."""
     for module in modules:
-        install_module(module)
+        if module not in ['tkinter']:
+            install_module(module)
+        else:
+            print(f'{module} cannot be installed using pip.')
+            print('Must be installed manually')
+            print()
 
 def install_module(module_name):
     """Install a module using the preferred pip command."""
@@ -76,6 +78,9 @@ from prettytable import PrettyTable as pt
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+from art import *
+from pynput.keyboard import Key, Listener
+from dateutil.relativedelta import relativedelta
 
 def create_pages(df,v,sel=None):
     pages = m.ceil(len(df)/int(settings["view_rows"]))
@@ -1241,7 +1246,7 @@ def plot_dataframe(df, plot, settings):
         
 
         # Create a list of months for x-axis labels
-        months = [start_date.strftime("%b-%Y") for start_date in pd.date_range(date2, periods=total_months, freq='M')]
+        months = [start_date.strftime("%b-%Y") for start_date in pd.date_range(date2, periods=total_months, freq='ME')]
         # Create a list of stacked expense values for each month
         #stacked_expense_values = [overview_stacks[key] for key in overview_stacks if key != income_type]
 
