@@ -1,31 +1,82 @@
-import pandas as pd
+import subprocess
+import importlib
+import sys
 import re
 import os
-import re
 import csv
 import glob
-import tkinter as tk
 import warnings
 import ast
 import calendar
-from tkinter import filedialog
-from datetime import datetime,timedelta
-from prettytable import PrettyTable as pt
-from collections import defaultdict
-import math as m
-import numpy as np
-from art import *
-from pynput.keyboard import Key, Listener
 import readline
 import traceback
 import shlex
+from collections import defaultdict
+import math as m
+from datetime import datetime,timedelta
+from art import *
+from pynput.keyboard import Key, Listener
+from dateutil.relativedelta import relativedelta
+
+required_modules = ['numpy', 'pandas', 'matplotlib', 'prettytable','tkinter','plotly']
+def check_modules(modules):
+    missing_modules = []
+    for module in modules:
+        if not is_module_installed(module):
+            missing_modules.append(module)
+    return missing_modules
+
+def is_module_installed(module_name):
+    """Check if a module is installed."""
+    try:
+        importlib.import_module(module_name)
+        return True
+    except ImportError:
+        return False
+
+def install_modules(modules):
+    """Install a list of modules using the preferred pip command."""
+    for module in modules:
+        install_module(module)
+
+def install_module(module_name):
+    """Install a module using the preferred pip command."""
+    print()
+    try:
+        print(f"Installing '{module_name}'...")
+        subprocess.check_call([sys.executable, "-m","pip","install", module_name])
+        print(f"'{module_name}' installed successfully.")
+    except subprocess.CalledProcessError:
+        print(f"Failed to install '{module_name}'. Please try to install it manually.")
+
+def display_missing_modules(modules):
+    print()
+    print("Missing Modules:")
+    for module in modules:
+        print(module)
+    print()
+
+if __name__ == '__main__':
+    missing_modules = check_modules(required_modules)
+    if missing_modules:
+        print("The following modules are missing:")
+        display_missing_modules(missing_modules)
+        should_install = input("Do you want to install the missing modules? (y/n): ").strip().lower()
+        if should_install == 'y':
+            install_modules(missing_modules)
+        else:
+            print("Skipping the installation of missing modules. The script may not work properly without them.")
+    else:
+        print("All required modules are installed.")
+
+import pandas as pd
+import tkinter as tk
+from tkinter import filedialog
+from prettytable import PrettyTable as pt
+import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-from dateutil.relativedelta import relativedelta
-#
 
-# To fix
-# details in budget is wrong after changing page views.
 def create_pages(df,v,sel=None):
     pages = m.ceil(len(df)/int(settings["view_rows"]))
     total_length = len(df)

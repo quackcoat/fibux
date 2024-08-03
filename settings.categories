@@ -115,7 +115,6 @@ category=rente;text=rente;value>0
 #dagligvare
 cat=dagligvarer;text=rema,netto,brugsen,abc lavpris,superlavpris,lidl,aldi,coop,føtex,normal,bilka,foetex,løvbjerg,kvickly,kaffeagent,meny,pant app
 cat=apotek;marked=;text=apotek,med24,apopro
-cat=kantine;text=kba gød,cheval
 cat=kiosk;text=7-eleven,bager,lagkagehuset
 #Bolig
 category=boliglån;marked=;date=first;text=totalkredit
@@ -134,14 +133,12 @@ category=bilforsikring;info=motorkøretøj;text=tryg
 #Ovrige faste
 category=streaming;marked=;text=hbo,netflix,disney,tv2 play,stofa,norlys digital,turgame,youtube,max.com
 category=streaming;marked=;info=youtubepremium
-category=streaming;text=mobilepay claus hors;value=440
 category=telefoni;marked=;text=call me,cbb
 category=kontaktlinse;text=kontaktlinse
 category=ulykke;info=børneforsikring,ulykkesforsikring;text=tryg
 category=sygeforsikring;text=sygeforsikringen danmark
-category=fagforening;text=a-kasse,dbio,danske bioanalytiker,ida,lønsikring
-category=institution;marked=;text=lundgaardskolen
-category=institution;marked=;text=herning kommune;value<-1800
+category=fagforening;text=a-kasse,dbio,ida,lønsikring
+category=institution;marked=;text=by kommune;value<-1800
 #Privatforbrug
 category=andet;text=gls
 category=fastfood;text=pizza,just-eat,just eat,burger,restaurant,starbuck,wolt,mcd
@@ -151,14 +148,14 @@ category=biograf;text=nfb,biograf
 category=elektronik;text=power,elgiganten,proshop,av-cables,batteri
 category=gambling;text=danskespil,poker
 category=møbler;text=biltema,jysk,basic & more,ikea, SG,bucketbloom
-category=gaver;text=br herning
+category=gaver;text=br by
 category=software;text=google play,apple.com,apps,forretning: google
 category=software;marked=;text=google;value=-34
 category=software;marked=;text=mambeno
 category=hobby;marked=;text=gør det se,bonnier
 category=hobby;text=BOG-IDE,hobbii,garnshoppen,panduro,yarn,butiksmusak
 category=legetøj;text=børnenes kartel
-category=Sport & fritid;text=gry dans,tjoerringif
+category=Sport & fritid;text=gry dans
 category=tøj & sko;text=h&m,snt,boozt,reshopper,klarna,babysam,viabill,stroempe,nanna xl,coolsko,minijacobi,zizzi,bylindgren,zalando,sketchers,blinkesko,sketchers,titteboo
 #category=ulykke;info=børneforsikring,ulykkeforsikring;text=q8,ingo,circle,f24
 #Diverse
