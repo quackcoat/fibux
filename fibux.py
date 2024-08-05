@@ -376,7 +376,8 @@ def get_newest_csv_file(import_folder):
 def read_csv_file(file_path, headers, csv_sep, csv_encoding, decimal_sep, thousand_sep):
     # read csv file
     new_data = pd.read_csv(file_path, sep=csv_sep, header=None, names=headers, dtype=str, encoding=csv_encoding)
-    new_data = new_data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    #new_data = new_data.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    new_data = new_data.apply(lambda col: col.map(lambda x: x.strip() if isinstance(x, str) else x))
 
     # Remove the 'ignore' column if it exists
     for i in range(len(headers)):
@@ -384,12 +385,18 @@ def read_csv_file(file_path, headers, csv_sep, csv_encoding, decimal_sep, thousa
             new_data = new_data.drop('ignore_'+str(i), axis=1) 
 
     # convert value and balance to float
-    new_data["value"] = new_data["value"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+    new_data["value"] = new_data["value"].str.replace(thousand_sep, "").str.replace(decimal_sep, ".").astype(float)
     if 'amount' in new_data:
-        new_data["amount"] = new_data["amount"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+        new_data["amount"] = new_data["amount"].str.replace(thousand_sep, "").str.replace(decimal_sep, ".").astype(float)
     if 'category_type' in new_data:
         new_data["category_type"] = pd.to_numeric(new_data["category_type"],errors='coerce')
-    new_data["balance"] = new_data["balance"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+    new_data["balance"] = new_data["balance"].str.replace(thousand_sep, "").str.replace(decimal_sep, ".").astype(float)
+    #new_data["value"] = new_data["value"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+    #if 'amount' in new_data:
+    #    new_data["amount"] = new_data["amount"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
+    #if 'category_type' in new_data:
+    #    new_data["category_type"] = pd.to_numeric(new_data["category_type"],errors='coerce')
+    #new_data["balance"] = new_data["balance"].str.replace(thousand_sep, "", regex=True).str.replace(decimal_sep, ".", regex=True).astype(float)
     
     return new_data
 
@@ -459,6 +466,9 @@ def import_change_by_id(df):
     return mod_df
 
 def import_data(input_df=None):
+    if input_df is not None:
+        if len(input_df) == 0:
+            input_df = None
     print('')
     print('')
     if os.path.exists("settings.import"):
@@ -583,7 +593,7 @@ def import_data(input_df=None):
                             if df is None:
                                 df = new_data
                             else:
-                                df = df.append(new_data, ignore_index=True)
+                                df = pd.concat([df, new_data], ignore_index=True)
                             match_found = True
                             tprint("New dataframe",font="aquaplan")
                             print(new_data)              
