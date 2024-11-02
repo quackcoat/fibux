@@ -419,7 +419,7 @@ def add_missing_columns(data):
         data.at[index, 'imported'] = dt
         data.at[index, 'changed'] = dt
         #cur_df = check_and_correct_df(cur_df)
-    data[add_col[1:]] = data[add_col[1:]].fillna('')
+    data[add_col[1:]] = data[add_col[1:]].fillna(0.0)
     data = check_and_correct_df(data)
     return data
 
@@ -796,7 +796,7 @@ def create_output(df,df_fil,v,output_method=0,silent=False):
         #for c in columns_to_set_empty:
         #    df_total[c][0] = ''
         df_total.loc[0] = numeric_columns.sum()
-        df_total.fillna('', inplace=True)
+        df_total.fillna(0.0, inplace=True)
     if output_method != 'df' and output_method != 'table':
         if output_method != 'all':
              df_sorted,v = create_pages(df_sorted,v)
